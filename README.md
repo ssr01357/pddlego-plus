@@ -3,6 +3,8 @@ Iteratively predict PDDL domain file with LLMs
 
 Code Usage
 
+Run interactive_CC.ipynb
+
 - Functions contain solver setting, OpenAI GPT setting, VAL setting, and other helper functions
   - In GPT set up: you could input your own OPENAI_API_KEY
   - In VAL set up:
