@@ -1,22 +1,20 @@
-(define (domain house-exploration)
-	(:requirements :strips :typing)
-	(:types location direction)
-	(:predicates 
-		(door ?loc1 - location ?loc2 - location ?dir - direction)
-		(open ?loc1 - location ?loc2 - location ?dir - direction)
-		(at ?loc - location)
-		(visited ?loc - location)
-	)
-
-	(:action open-door
-		:parameters (?loc1 - location ?loc2 - location ?dir - direction)
-		:precondition (and (door ?loc1 ?loc2 ?dir))
-		:effect (open ?loc1 ?loc2 ?dir)
-	)
-
-	(:action move
-		:parameters (?from - location ?to - location ?dir - direction)
-		:precondition (and (at ?from) (open ?from ?to ?dir))
-		:effect (and (at ?to) (not (at ?from)) (visited ?to))
-	)
+(define (domain exploration)
+    (:requirements :strips :typing)
+    (:types location direction)
+    (:predicates 
+        (at ?loc - location)
+        (connected ?loc1 - location ?loc2 - location ?dir - direction)
+        (door-closed ?loc1 - location ?loc2 - location)
+        (door-open ?loc1 - location ?loc2 - location)
+    )
+    (:action open-door
+        :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+        :precondition (and (connected ?loc1 ?loc2 ?dir) (door-closed ?loc1 ?loc2))
+        :effect (and (door-open ?loc1 ?loc2) (not (door-closed ?loc1 ?loc2)))
+    )
+    (:action move
+        :parameters (?from - location ?to - location ?dir - direction)
+        :precondition (and (at ?from) (connected ?from ?to ?dir) (door-open ?from ?to))
+        :effect (and (at ?to) (not (at ?from)))
+    )
 )
