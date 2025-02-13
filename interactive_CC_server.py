@@ -1,7 +1,9 @@
 import time
+from datetime import date
 import csv
 import json
 import asyncio
+import re
 
 from kani import Kani
 from kani.engines.huggingface import HuggingEngine
@@ -15,8 +17,7 @@ from openai import OpenAI
 import os
 
 client = OpenAI()
-os.environ["OPENAI_API_KEY"] = ""
-
+# os.environ["OPENAI_API_KEY"] = ""
 
 # Solver set up
 def run_solver(domain_file, problem_file, solver):
@@ -46,11 +47,10 @@ def get_action_from_pddl(df, pf):
     err_2 = result['stderr']
     return map_actions(action), err_2
 
-
 # LLM set up
 def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"):
 
-    if "gpt" in model_name: # closed source LLMs
+    if model_name in ['o3-mini', 'gpt-4o']: # closed source LLMs
         response = client.chat.completions.create(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],
@@ -66,6 +66,10 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             response_content = response_content.lstrip("```json").rstrip("```").strip()
 
         result = json.loads(response_content)
+        # try:
+        #     result = json.loads(response_content)
+        # except json.JSONDecodeError:
+        #     return None, None
 
         df = result.get("df", None)
         pf = result.get("pf", None)
@@ -103,7 +107,6 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         # deepseek-ai/DeepSeek-R1-Distill-Llama-70B
         response_content = response_content[response_content.find('</think>')+10:]
 
-        # If your model returns a JSON block wrapped in triple backticks, strip them
         if response_content.startswith("```json"):
             response_content = (
                 response_content
@@ -111,6 +114,23 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 .rstrip("```")
                 .strip()
             )
+        
+        def extract_json_block(text):
+            # This pattern captures everything between ```json and the next ```
+            # (?s) makes '.' match newlines as well
+            pattern = r"(?s)```json\s*(.*?)\s*```"
+            
+            match = re.search(pattern, text)
+            if match:
+                # match.group(1) contains the content between the backticks
+                return match.group(1).strip()
+            return text
+        # print(response_content)
+        response_content = extract_json_block(response_content)
+        print(response_content)
+
+        # # If your model returns a JSON block wrapped in triple backticks, strip them
+        
 
         # Attempt to parse the JSON response
         try:
@@ -269,7 +289,6 @@ def detect_duplicates(action_lst, threshold):
 
     # If no sequence repeats up to the threshold, return False
     return False
-
 
 # Edit mode but NOT USING it now...
 def apply_edit_domain(prev_df, edit_json):
@@ -504,6 +523,15 @@ def llm_to_pddl_check_delta(obs, taken_action, prev_df="", prev_pf=""):
 
 
 # Prompt modify and main function
+env = TextWorldExpressEnv(envStepLimit=100)
+NUM_LOCATIONS = 11
+env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+valid_actions = sorted(infos['validActions'])
+valid_actions.remove('look around')
+valid_actions.remove('inventory')
+# brief_obs = "Action: look around\n" + summarize_obs(obs)+'\n'
+
 def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message = None):
     prompt_format = f"""
         Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
@@ -624,7 +652,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             prompt += prompt_simulation_error
 
     if have_duplicate:
-        print('You have duplicated error message!!')
+        # print('You have duplicated error message!!')
         prompt += prompt_duplicate_note
 
 
@@ -641,12 +669,12 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     # ....
     return df, pf, err, prompt
 
-def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", trials = 2):
+def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial = 0, end_trial = 11):
     # trial_record = 
     # structured_info_record = "output/summary"
-    for trial in trials:
-        # date = ... # today's date
-        file_name = f"output/05_020625_100trials/{date}_{model_name}_{trial}.txt"
+    for trial in range(start_trial, end_trial):
+        today = date.today()
+        file_name = f"output/05_020625_100trials/{today}_{model_name.replace("/","_")}_{trial}.txt"
         trial_record = []
         
         env = TextWorldExpressEnv(envStepLimit=100)
@@ -895,10 +923,11 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         
         with open("output/results.csv", "a", newline="") as csvfile:
             # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
-            data_row = [date, model_name, trial, len(trial_record)-1,trial_record[-1][-1], trial_record]
+            data_row = [today, model_name, trial, len(trial_record)-1,trial_record[-1][-1], trial_record]
             writer = csv.writer(csvfile)
             writer.writerow(data_row)
 
 
-run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 2)
-# run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 2)
+# run_iterative_model("o3-mini", 0, 11) # gpt-4o; o3-mini
+run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 10) # models--google--gemma-2-27b-it
+# run_iterative_model("models--google--gemma-2-27b-it", 0, 10)
