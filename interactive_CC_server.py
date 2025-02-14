@@ -105,7 +105,9 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         response_content = asyncio.run(_ask_model(model_name, prompt))
 
         # deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-        response_content = response_content[response_content.find('</think>')+10:]
+        print(response_content)
+        if '</think>' in response_content:
+            response_content = response_content[response_content.find('</think>')+10:]
 
         if response_content.startswith("```json"):
             response_content = (
@@ -929,5 +931,5 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 # run_iterative_model("o3-mini", 0, 11) # gpt-4o; o3-mini
-run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 10) # models--google--gemma-2-27b-it
-# run_iterative_model("models--google--gemma-2-27b-it", 0, 10)
+# run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 10) # models--google--gemma-2-27b-it
+run_iterative_model("google/gemma-2-27b-it", 0, 10)
