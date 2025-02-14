@@ -105,7 +105,7 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         response_content = asyncio.run(_ask_model(model_name, prompt))
 
         # deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-        print(response_content)
+        # print(response_content)
         if '</think>' in response_content:
             response_content = response_content[response_content.find('</think>')+10:]
 
@@ -129,7 +129,7 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             return text
         # print(response_content)
         response_content = extract_json_block(response_content)
-        print(response_content)
+        # print(response_content)
 
         # # If your model returns a JSON block wrapped in triple backticks, strip them
         
@@ -674,6 +674,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
 def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial = 0, end_trial = 11):
     # trial_record = 
     # structured_info_record = "output/summary"
+    coin_found = False
     for trial in range(start_trial, end_trial):
         today = date.today()
         file_name = f"output/05_020625_100trials/{today}_{model_name.replace("/","_")}_{trial}.txt"
@@ -688,11 +689,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             f.write(f"Gold path: {env.getGoldActionSequence()} \n")
             f.write(f"Valid Actions: {infos['validActions']} \n")
             f.write(f"taskDescription: {infos['taskDescription']} \n")
-
-        # print("Observations: "+obs)
-        # print("Gold path: " + str(env.getGoldActionSequence()))
-        # print("Valid Actions: " + str(infos['validActions']))
-        # print("taskDescription: " + str(infos['taskDescription']))
 
         # task_description = infos['taskDescription']
         valid_actions = sorted(infos['validActions'])
@@ -719,8 +715,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
         for step_id in range(0, MAX_STEPS):
             with open(file_name, "a") as f:
-                f.write(f"\n\n====Step {step_id}==== \n") 
-            # print(f"\n====Step {step_id}====")
+                f.write(f"\n\n====Step {step_id}==== \n")
 
             trial_step_record = []
 
@@ -734,8 +729,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 with open(file_name, "a") as f:
                     f.write(f'\n----Larger Loop No. {within_step_tries}---- \n') 
                     f.write(f'successful_actions: {successful_actions} \n')
-                # print(f'----Larger Loop No. {within_step_tries}----')
-                # print(f'successful_actions: {successful_actions}')
                 within_step_tries += 1
 
                 if within_step_tries > 1: # second or third ... time in the larger loop
@@ -754,8 +747,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 start_checkpoint = True
                 while start_checkpoint or action_queue:
                     with open(file_name, "a") as f:
-                        f.write(f'Small Loop, action_queue: {action_queue} \n') 
-                    # print(f'Small Loop, action_queue: {action_queue}')
+                        f.write(f'Small Loop, action_queue: {action_queue} \n')
                     start_checkpoint = False
 
                     if not action_queue:
@@ -773,12 +765,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                 f.write(f"Error: {err} \n")
                                 f.write(f"Prompt: {prompt} \n") 
                                 f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
-                                f.write(f"Actions from solver(df, pf): {action} \n") 
-                            # print("\n--Small Loop--",num_tries)
-                            # print("Error:", err)
-                            # print("Prompt:", prompt)
-                            # print("df and pf:", df, pf)
-                            # print("Actions from solver(df, pf)", action)
+                                f.write(f"Actions from solver(df, pf): {action} \n")
 
                             while not action and num_tries < 5:
                                 df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, False, edit)
@@ -790,13 +777,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                     f.write(f"Error: {err} \n")
                                     f.write(f"Prompt: {prompt} \n") 
                                     f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
-                                    f.write(f"Actions from solver(df, pf): {action} \n") 
-
-                                # print("\n--Small Loop--",num_tries)
-                                # print("Error:", err)
-                                # print("Prompt:", prompt)
-                                # print("df and pf:", df, pf)
-                                # print("Actions from solver(df, pf)", action)
+                                    f.write(f"Actions from solver(df, pf): {action} \n")
                         else:
                             num_tries = 0
                             # Every time read new error message from larger loop
@@ -809,12 +790,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                 f.write(f"Error: {err} \n")
                                 f.write(f"Prompt: {prompt} \n") 
                                 f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
-                                f.write(f"Actions from solver(df, pf): {action} \n") 
-                            # print("\n--Small Loop--",num_tries)
-                            # print("Error:", err)
-                            # print("Prompt:", prompt)
-                            # print("df and pf:", df, pf)
-                            # print("Actions from solver(df, pf)", action)
+                                f.write(f"Actions from solver(df, pf): {action} \n")
 
                             while not action and num_tries < 5:
                                 df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message)
@@ -826,12 +802,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                     f.write(f"Error: {err} \n")
                                     f.write(f"Prompt: {prompt} \n") 
                                     f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
-                                    f.write(f"Actions from solver(df, pf): {action} \n") 
-                                # print("\n--Small Loop--",num_tries)
-                                # print("Error:", err)
-                                # print("Prompt:", prompt)
-                                # print("df and pf:", df, pf)
-                                # print("Actions from solver(df, pf)", action)
+                                    f.write(f"Actions from solver(df, pf): {action} \n")
 
                         # append which loop it stops
                         # Must be under first time generating the actions
@@ -847,7 +818,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
                     with open(file_name, "a") as f:
                         f.write(f"Current action_queue: {action_queue} \n")
-                    # print("Current action_queue:", action_queue)
                     
                     taken_action = action_queue.pop(0)
                     # Feedback from plan-environment interaction
@@ -862,8 +832,8 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         obs, reward, done, infos = env.step(taken_action)
                         end_game = True
                         with open(file_name, "a") as f:
-                            f.write('Coin found!') 
-                        # print('Coin found!')
+                            f.write('Coin found!')
+                            coin_found = True
                         break
                     
                     action_text = "Action: " + taken_action + "\n"
@@ -873,10 +843,8 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
                     obs_queue.append(brief_obs)
                     with open(file_name, "a") as f:
-                        f.write(f"> {taken_action} \n {brief_obs} \n") 
-                    # print(">", taken_action)
-                    # print(brief_obs)
-                    # =====
+                        f.write(f"> {taken_action} \n {brief_obs} \n")
+
                     # Define action passed
                     if "You can't move there, the door is closed." in brief_obs:
                         large_loop_error_message = f"This is the action you take: {taken_action}. \
@@ -889,7 +857,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         break
                     elif "I'm not sure what you mean." in brief_obs:
                         action_passed = False
-                        # print('===error message here!', obs_text)
                         if "open door" in taken_action:
                             large_loop_error_message = f'This is the action you take: {taken_action}. \
                                 When you try to open door, there is no door here or there is nothing in this direction.\
@@ -900,7 +867,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         else:
                             large_loop_error_message = f'This is the action you take: {taken_action}. \
                                 You got the environment error!'
-                        
                         break
 
                     # append into overall memory and dictionary format
@@ -911,8 +877,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         action_passed = True
                         successful_actions.extend(tem_action_queue)
                         overall_memory += tem_memory
-
-                # break here
 
                 if (within_step_tries == 5 and not action_passed) or end_game:
                     end_game = True
@@ -925,11 +889,11 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         
         with open("output/results.csv", "a", newline="") as csvfile:
             # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
-            data_row = [today, model_name, trial, len(trial_record)-1,trial_record[-1][-1], trial_record]
+            data_row = [today, model_name, trial, coin_found, len(trial_record)-1,trial_record[-1][-1], trial_record]
             writer = csv.writer(csvfile)
             writer.writerow(data_row)
 
 
 # run_iterative_model("o3-mini", 0, 11) # gpt-4o; o3-mini
-# run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 10) # models--google--gemma-2-27b-it
-run_iterative_model("google/gemma-2-27b-it", 0, 10)
+run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 8, 10) # models--google--gemma-2-27b-it
+run_iterative_model("google/gemma-2-27b-it", 6, 10)
