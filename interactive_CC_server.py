@@ -154,6 +154,132 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         return df, pf
 
 
+# Set up baseline model: get actions directly from model
+def run_gpt_for_actions_baseline(prompt, model_name):
+    if model_name in ['o3-mini', 'gpt-4o']: # closed source LLMs
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            # max_completion_tokens=2048,
+            top_p=1,
+            frequency_penalty=0,
+            presence_penalty=0
+        )
+
+        response_content = response.choices[0].message.content
+
+        if response_content.startswith("```json"):
+            response_content = response_content.lstrip("```json").rstrip("```").strip()
+
+        def extract_json_block(text):
+            # This pattern captures everything between ```json and the next ```
+            # (?s) makes '.' match newlines as well
+            pattern = r"(?s)```json\s*(.*?)\s*```"
+            
+            match = re.search(pattern, text)
+            if match:
+                # match.group(1) contains the content between the backticks
+                return match.group(1).strip()
+            return text
+
+        response_content = extract_json_block(response_content)
+
+        result = json.loads(response_content)
+
+        actions = result.get("actions", None)
+
+        if actions is None:
+            raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
+
+        return actions
+        
+    else: # Open source LLMs
+        """
+        Run a prompt against a HuggingFace model using Kani and parse out
+        'df' and 'pf' from the JSON response. Raises ValueError if missing keys.
+        """
+        async def _ask_model(model_name, user_prompt):
+            # Create Hugging Face engine
+            engine = HuggingEngine(
+                model_id=model_name,
+                use_auth_token=True, 
+                model_load_kwargs={
+                    "device_map": "auto",
+                    "trust_remote_code": True
+                }
+            )
+            # Wrap in Kani
+            ai = Kani(engine, system_prompt="")
+
+            # Send the user prompt and get the response string
+            response = await ai.chat_round_str(user_prompt)
+            return response
+
+        # Because Kani calls are async, we need to run them in an event loop
+        response_content = asyncio.run(_ask_model(model_name, prompt))
+
+        # deepseek-ai/DeepSeek-R1-Distill-Llama-70B
+        # print(response_content)
+        if '</think>' in response_content:
+            response_content = response_content[response_content.find('</think>')+10:]
+
+        if response_content.startswith("```json"):
+            response_content = (
+                response_content
+                .lstrip("```json")
+                .rstrip("```")
+                .strip()
+            )
+        
+        def extract_json_block(text):
+            # This pattern captures everything between ```json and the next ```
+            # (?s) makes '.' match newlines as well
+            pattern = r"(?s)```json\s*(.*?)\s*```"
+            
+            match = re.search(pattern, text)
+            if match:
+                # match.group(1) contains the content between the backticks
+                return match.group(1).strip()
+            return text
+
+        response_content = extract_json_block(response_content)
+
+        try:
+            result = json.loads(response_content)
+        except json.JSONDecodeError:
+            raise ValueError(
+                f"Model response is not valid JSON:\n{response_content}"
+            )
+
+        actions = result.get("actions", None)
+
+        if actions is None:
+            raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
+
+        return actions
+
+def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None):
+    prompt = f"""
+        You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
+        Here are your current observations: {brief_obs}
+        Here are some valid actions you can take: {valid_actions}
+        Your goal is to explore new locations and interact with the environment effectively. Ensure actions are logical and do not repeat unnecessarily.
+
+        Additional context:
+        {overall_memory if overall_memory else "No additional memory available."}
+
+        If there are errors or obstacles, here is the message:
+        {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
+
+        Provide the output in strict JSON format like this:
+        {{
+            "actions": ["action1", "action2", ...]
+        }}
+    """
+    actions = run_gpt_for_actions_baseline(prompt, model_name)
+    return actions
+
+
 # VAL setup
 # common_path = "/Users/krystalgong/Documents/GitHub/pddlego-df/"
 
@@ -674,8 +800,8 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
 def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial = 0, end_trial = 11):
     # trial_record = 
     # structured_info_record = "output/summary"
-    coin_found = False
     for trial in range(start_trial, end_trial):
+        coin_found = False
         today = date.today()
         file_name = f"output/05_020625_100trials/{today}_{model_name.replace("/","_")}_{trial}.txt"
         trial_record = []
@@ -893,7 +1019,184 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             writer = csv.writer(csvfile)
             writer.writerow(data_row)
 
+def run_baseline_model(model_name, start_trials, end_trials):
+    for trial in range(start_trials, end_trials):
+        coin_found = False
+        today = date.today()
+        file_name = f"output/06_021425_baseline/{today}_{model_name.replace('/','_')}_{trial}.txt"
+        trial_record = []  # This will be a list of steps; each step is a list of large-loop iteration numbers
 
+        env = TextWorldExpressEnv(envStepLimit=100)
+        NUM_LOCATIONS = 11
+        env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+        obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+        with open(file_name, "a") as f:
+            f.write(f"Observations: {obs} \n")
+            f.write(f"Gold path: {env.getGoldActionSequence()} \n")
+            f.write(f"Valid Actions: {infos['validActions']} \n")
+            f.write(f"taskDescription: {infos['taskDescription']} \n")
+
+        valid_actions = sorted(infos['validActions'])
+        if 'look around' in valid_actions:
+            valid_actions.remove('look around')
+        if 'inventory' in valid_actions:
+            valid_actions.remove('inventory')
+
+        MAX_STEPS = 20
+        brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
+        with open(file_name, "a") as f:
+            f.write(f"brief_obs: {brief_obs} \n")
+
+        action_queue = []
+        obs_queue = []
+        all_actions = []
+        successful_actions = []
+        overall_memory = brief_obs
+        overall_memory_dic = []  # For recording detailed memory if needed
+        end_game = False
+
+        for step_id in range(MAX_STEPS):
+            with open(file_name, "a") as f:
+                f.write(f"\n\n====Step {step_id}==== \n")
+            trial_step_record = []  # This will record each large-loop try for the current step
+            within_step_tries = 0
+            action_passed = False
+            large_loop_error_message = ""
+
+            # Under each step, try up to 5 large-loop iterations until actions pass.
+            while within_step_tries < 5 and not action_passed:
+                with open(file_name, "a") as f:
+                    f.write(f"\n----Larger Loop No. {within_step_tries}---- \n")
+                    f.write(f"successful_actions: {successful_actions} \n")
+                within_step_tries += 1
+
+                if within_step_tries > 1:  # For subsequent tries, reset the environment
+                    env = TextWorldExpressEnv(envStepLimit=100)
+                    NUM_LOCATIONS = 11
+                    env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+                    obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+                    for act in successful_actions:
+                        obs, reward, done, infos = env.step(act)
+
+                # Reset action queues and temporary memory for this large-loop iteration.
+                action_queue = []
+                tem_action_queue = []
+                tem_memory = ""
+
+                start_checkpoint = True
+                while start_checkpoint or action_queue:
+                    with open(file_name, "a") as f:
+                        f.write(f"Small Loop, action_queue: {action_queue} \n")
+                    start_checkpoint = False
+
+                    if not action_queue:
+                        if obs_queue:
+                            brief_obs = "\n".join(obs_queue)
+                            obs_queue = []
+                        # Generate actions using the baseline LLM function.
+                        actions = llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory, large_loop_error_message)
+                        with open(file_name, "a") as f:
+                            f.write(f"Generated actions: {actions} \n")
+
+                        if actions:
+                            action_queue.extend(actions)
+                            tem_action_queue.extend(actions)
+                            all_actions.extend(actions)
+                        else:
+                            end_game = True
+                            break
+
+                    with open(file_name, "a") as f:
+                        f.write(f"Current action_queue: {action_queue} \n")
+                    taken_action = action_queue.pop(0)
+                    obs, reward, done, infos = env.step(taken_action)
+
+                    # Immediately end the game if coin is found.
+                    if "coin" in obs:
+                        taken_action = "take coin"
+                        obs, reward, done, infos = env.step(taken_action)
+                        end_game = True
+                        with open(file_name, "a") as f:
+                            f.write("Coin found!\n")
+                        coin_found = True
+                        break
+
+                    action_text = "Action: " + taken_action + "\n"
+                    obs_text = summarize_obs(obs) + "\n"
+                    brief_obs = action_text + obs_text
+                    obs_queue.append(brief_obs)
+                    with open(file_name, "a") as f:
+                        f.write(f"> {taken_action} \n {brief_obs} \n")
+
+                    # Check for common errors in the observation and update the error message.
+                    if "You can't move there, the door is closed." in brief_obs:
+                        large_loop_error_message = (
+                            f"This is the action you take: {taken_action}. "
+                            "The door that you are moving to is closed. "
+                            "You should first open the door to that direction then move there!"
+                        )
+                        break
+                    elif "That is already open." in brief_obs:
+                        large_loop_error_message = (
+                            f"This is the action you take: {taken_action}. "
+                            "You try to open a door that is already open. You already visited here. "
+                            "Make sure the status of door is correct."
+                        )
+                        break
+                    elif "I'm not sure what you mean." in brief_obs:
+                        if "open door" in taken_action:
+                            large_loop_error_message = (
+                                f"This is the action you take: {taken_action}. "
+                                "When you try to open door, there is no door here or nothing in that direction. "
+                                "If there is no door, you can directly move to that direction.\n"
+                            )
+                        elif "move" in taken_action:
+                            large_loop_error_message = (
+                                f"This is the action you take: {taken_action}. "
+                                "You cannot move to that direction. Review your action predicates and the problem files to check the status."
+                            )
+                        else:
+                            large_loop_error_message = (
+                                f"This is the action you take: {taken_action}. "
+                                "You got the environment error!"
+                            )
+                        break
+
+                    tem_memory += brief_obs
+                    overall_memory_dic.append({"type": "action", "content": taken_action})
+                    overall_memory_dic.append({"type": "observation", "content": summarize_obs(obs)})
+
+                    if not action_queue:
+                        action_passed = True
+                        successful_actions.extend(tem_action_queue)
+                        overall_memory += tem_memory
+
+                # Record this large-loop iteration result for the step.
+                trial_step_record.append(within_step_tries)
+                if (within_step_tries == 5 and not action_passed) or end_game:
+                    end_game = True
+                    break
+
+            trial_record.append(trial_step_record)
+            if end_game:
+                break
+
+        with open("output/baseline_results.csv", "a", newline="") as csvfile:
+            # Write out: date, model_name, trial, coin_found, last step index, last large-loop iteration, and the full trial record.
+            data_row = [today, model_name, trial, coin_found, len(trial_record)-1, trial_record[-1] if trial_record else None, trial_record]
+            writer = csv.writer(csvfile)
+            writer.writerow(data_row)
+
+
+
+# Run baseline models
+# run_baseline_model("gpt-4o", 6, 10)
+# run_baseline_model("o3-mini", 0, 10)
+run_baseline_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 3, 10) # models--google--gemma-2-27b-it
+run_baseline_model("google/gemma-2-27b-it", 0, 10)
+
+
+# Run PDDL generation models
 # run_iterative_model("o3-mini", 0, 11) # gpt-4o; o3-mini
-run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 8, 10) # models--google--gemma-2-27b-it
-run_iterative_model("google/gemma-2-27b-it", 6, 10)
+# run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
+# run_iterative_model("google/gemma-2-27b-it", 6, 10)
