@@ -75,8 +75,8 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         df = result.get("df", None)
         pf = result.get("pf", None)
 
-        if df is None or pf is None:
-            raise ValueError("Missing 'df' or 'pf' in the response. Check the prompt or the model output.")
+        # if df is None or pf is None:
+        #     raise ValueError("Missing 'df' or 'pf' in the response. Check the prompt or the model output.")
 
         return df, pf
     
@@ -651,218 +651,7 @@ def llm_to_pddl_check_delta(obs, taken_action, prev_df="", prev_pf=""):
     return False, df, pf
 
 
-# ==== Merging method helper functions ====
-# Merging method: Without previous problem file but only feeding observations
-def generate_problem_file_from_observation(observation: str, model_name: str = "o3-mini", domain_file: str = ""):
-    """
-    Calls your LLM to produce a *new* PDDL problem file (pf) from scratch,
-    based ONLY on the new observation.
 
-    Args:
-        observation: A string describing the new environment observation,
-                     e.g., "You see a door to the north leading to another room."
-        model_name: Which model name to call in your existing code.
-        domain_file: If needed, you can optionally pass the domain file as context
-                     to ensure the problem file lines up with the domain's actions.
-                     (Might be empty if your LLM does not strictly need it.)
-
-    Returns:
-        A string containing ONLY the newly generated problem file (pf).
-    """
-
-    # Construct a prompt that gives:
-    #   1) The domain context (if you want to pass domain_file).
-    #   2) The latest observation that should define the new problem file.
-    #   3) Instructions to *not* rely on older PF, but only this observation.
-
-    prompt = f"""
-        You are building a PDDL problem file from scratch, based ONLY on this observation:
-        {observation}
-
-        You do not have access to any previous problem file. 
-        You do have a domain file with known actions, if you need it:
-        {domain_file}
-
-        Your goal:
-        - Include only the relevant objects, initial states, and goals that reflect this single new observation.
-        - The problem file must be self-contained (i.e., must have (:objects ...), (:init ...), and (:goal ...)).
-        - Use the domain's recognized actions or objects if needed, but do not assume any outside info not present in observation.
-
-        Output strictly in JSON:
-        {{
-        "df": "CONTENT_OF_THE_FIXED_DOMAIN_FILE"
-        "pf": "CONTENT_OF_THE_PROBLEM_FILE"
-        }}
-        """
-
-    # Reuse your function run_llm_model() to get a JSON with "pf".
-    # You can ignore the "df" from the response if it exists.
-    # For example:
-    df, pf = run_llm_model(prompt, model_name=model_name)
-    # Some models might return an empty domain in 'df'.
-    # We only care about pf here, so we just return pf.
-
-    return pf
-
-def fix_problem_file_with_loops(domain_file: str, initial_problem_file: str, model_name: str = "o3-mini", max_large_loops: int = 5) -> str:
-    """
-    Runs your 'large loop' and 'small loop' approach to iteratively fix a new problem file
-    until it becomes stable (i.e., it yields valid or plausible actions in your environment).
-
-    Args:
-        domain_file: Current domain file (since the domain might remain constant).
-        initial_problem_file: The brand-new PF that we want to fix iteratively.
-        model_name: The model to call within loops.
-        max_large_loops: How many times we allow re-generation if we keep failing.
-
-    Returns:
-        A *final, corrected* PF string that survived your loops or ended as best possible.
-    """
-
-    # Pseudocode structure:
-    # 1) Start with 'pf' = initial_problem_file
-    # 2) For up to max_large_loops:
-    #    a) Attempt to solve with run_solver() -> get_action_from_pddl()
-    #    b) If solver fails or environment step fails, call LLM again to fix PF
-    #       based on error message.
-    #    c) If solver succeeds and environment steps do not produce errors,
-    #       break out of the loop.
-    # 3) Return the final PF (whatever it is after all attempts).
-
-    current_pf = initial_problem_file
-    error_msg_solver = ""
-    error_msg_env = ""
-
-    for loop_idx in range(max_large_loops):
-        # Attempt to get actions
-        actions, solver_err = get_action_from_pddl(domain_file, current_pf)
-
-        if not actions:
-            # If no plan found, we ask the LLM to fix the PF based on 'solver_err'
-            prompt_error_fix = f"""
-                We tried to solve the domain + problem, but the solver gave no valid plan or returned an error:
-                {solver_err}
-
-                Please fix the problem file so that we can at least generate a plan. 
-                Output strictly JSON:
-                {{
-                "pf": "CORRECTED_PROBLEM_FILE"
-                }}
-                """
-            # Call LLM to produce a new PF from the partial prompt
-            _df, new_pf = run_llm_model(prompt_error_fix, model_name=model_name)
-            current_pf = new_pf
-        else:
-            # We have a plan. Next: we might check environment or further validations.
-            # If you want to run environment steps, do that (like in your small loops).
-            # For simplicity, let's assume we trust the plan if the solver gave us something:
-            # You can embed your environment checks here (like stepping and checking obs).
-            # If environment check fails, update error_msg_env and fix. Otherwise, break.
-
-            # If environment fails, do something like:
-            #   error_msg_env = "Environment says door is closed; can't move."
-            #   <call LLM to fix problem file>
-            # but let's keep it minimal.
-
-            break
-
-    return current_pf
-
-def merge_problem_files_llm(old_problem_file: str, new_problem_file: str, model_name: str = "o3-mini") -> str:
-    """
-    Uses an LLM to merge the old PF with the newly fixed PF. The LLM must:
-      - incorporate new objects, inits, or goals from the new PF,
-      - retain the old PF's relevant info,
-      - not create duplicates or contradictory facts,
-      - unify the final '(:goal ...)' in a way that preserves exploration.
-
-    Returns a final PF as a string.
-    """
-
-    prompt = f"""
-        You have two problem files (PDDL). The old problem file:
-        <<<
-        {old_problem_file}
-        >>>
-
-        The new problem file:
-        <<<
-        {new_problem_file}
-        >>>
-
-        Merge them so that:
-        - You include any new objects or init facts from the new PF if they are truly new.
-        - You do not lose any critical old PF objects or init facts that are still valid.
-        - The final goal should reflect both ensuring the new place is discovered or consistent with your exploration aim.
-
-        Output strictly in JSON:
-        {{
-        "pf": "YOUR_FINAL_MERGED_PROBLEM_FILE"
-        }}
-    """
-
-    _df, merged_pf = run_llm_model(prompt, model_name=model_name)
-    return merged_pf
-
-def merge_problem_files_code(old_pf: str, new_pf: str) -> str:
-    """
-    A *code-based* or heuristic-based approach to merging two PDDL problem files.
-    You can parse the parentheses or lines to:
-      - unify the (:objects ...) section
-      - unify the (:init ...) section
-      - unify or choose the best (:goal ...)
-    Then produce a final merged PF. This is a rough example.
-
-    Returns a single final PF string.
-    """
-
-    # 1. Extract objects, init, goal from old_pf
-    old_objects = []
-    old_init = []
-    old_goal = []
-    # (Write your parser code for old_pf below or call an existing parser.)
-
-    # 2. Extract objects, init, goal from new_pf
-    new_objects = []
-    new_init = []
-    new_goal = []
-    # (Write your parser code for new_pf below.)
-
-    # 3. Merge objects
-    # For example, unify sets:
-    final_objects_set = set(old_objects) | set(new_objects)
-
-    # 4. Merge init
-    # For instance, unify sets again. Remove duplicates.
-    final_init_set = set(old_init) | set(new_init)
-
-    # 5. Choose or unify the goal
-    # If your approach is "always last known goal," or "union of old + new," do it here.
-    # For example, choose new PF's goal if you want the "latest location" to be the goal:
-    final_goal = new_goal if new_goal else old_goal
-
-    # 6. Rebuild the PF with the merged sections:
-    final_pf = f"""
-        (define (problem MergedProblem)
-        (:domain MyDomain)
-
-        (:objects
-            {' '.join(sorted(list(final_objects_set)))}
-        )
-
-        (:init
-            {"\n    ".join(sorted(list(final_init_set)))}
-        )
-
-        (:goal
-            {" ".join(final_goal)}
-        )
-        )
-    """
-
-    # Return the merged PF string
-    return final_pf
-# ==== Merging method helper functions (end) ====
 
 # Prompt modify and main function
 env = TextWorldExpressEnv(envStepLimit=100)
@@ -1011,6 +800,163 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     # ....
     return df, pf, err, prompt
 
+# ==== Merging method helper functions ====
+# Merging method: Without previous problem file but only feeding observations
+def generate_problem_file_from_observation(observation, model_name="o3-mini", domain_file="", err="", err_2=""):
+    # prompt = f"""
+    #     You are in an environment that you explore step by step. You must build and update PDDL files of the environment based on only your observations. 
+    #     Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
+    #     Do not assume that there will be a door connecting rooms.
+    #     Your task is always to keep exploration and go to a location you have not visited yet.
+    #     In other words, your goal should go to other not visited location.
+    #     If you enter a room, make sure you put everything you observed such as the direction in the problem file.
+        
+    #     Here are some valid actions you can take: {valid_actions}
+    #     You should generate df and pf strictly follow this valid actions. There are in total 2 actions, that should exactly be the following two:
+    #     1. :action open-door
+    #         :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    #     2. :action move
+    #         :parameters (?from - location ?to - location ?dir - direction)
+    #     You should have a goal in the problem file like this: 
+    #     (:goal 
+    #         (at ?location)
+    #     ) where location should be somewhere not visited
+    #     Note: in problem file's init, you shouldn't have "not ()" but only the single status
+        
+
+    #     The domain file is here: {domain_file}
+    #     If it is empty, remember to build a PDDL domain file from scratch first. 
+    #     If you have already built one domain file, i.e. it is not empty, you need to check and revise according to your understanding or the following error messages: {err} and {err_2}.
+
+    #     Now, you are building a PDDL problem file from scratch, based ONLY on this observation:
+    #     {observation}
+    #     You do not have access to any previous problem file.
+
+    #     Your goal:
+    #     - Include only the relevant objects, initial states, and goals that reflect this single observation.
+    #     - The problem file must be self-contained (i.e., must have (:objects ...), (:init ...), and (:goal ...)).
+    #     - Use the domain's recognized actions or objects if needed, but do not assume external info not in the observation.
+
+    #     Output strictly in JSON:
+    #     {{
+    #         "df": "CONTENT_OF_THE_DOMAIN_FILE",
+    #         "pf": "CONTENT_OF_THE_PROBLEM_FILE"
+    #     }}
+    # """
+    prompt = f"""You are in an environment that you explore step by step. Your job is to build and update the PDDL files (both the domain file and the problem file) strictly based on your observations—do not add information that has not been observed. In particular:
+        - Do not invent objects or rooms that are not mentioned in the observations.
+        - If you see a closed door, assume there may be a room behind it—but only include it if supported by the observation.
+        - Do not assume a door connects two rooms unless it is clearly observed.
+        - Your overall goal is to keep exploring and reach a location that has not yet been visited.
+
+        You have the following valid actions available (and you must follow these exactly):
+        1. **:action open-door**  
+        :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+        2. **:action move**  
+        :parameters (?from - location ?to - location ?dir - direction)
+
+        Additionally, your problem file must include a goal section exactly in this format:
+        (:goal (at ?location) )
+
+        where “?location” is replaced with a location that has not been visited.
+
+        The current domain file is provided here: {domain_file}
+        - If this domain file is empty, first build a PDDL domain file from scratch.
+        - If the domain file is not empty, check and, if necessary, revise it according to your understanding or the following error messages: {err} and {err_2}.
+
+        Now, you are tasked with building a PDDL **problem file** from scratch based solely on the following observation:
+        {observation}
+        *Note: You do not have access to any previous problem file.*
+
+        Your goals for generating the problem file are:
+        - Include only the relevant objects, initial states, and goals that directly reflect this observation.
+        - Ensure the problem file is self-contained (i.e., it must include the sections (:objects ...), (:init ...), and (:goal ...)).
+        - Use the objects or actions defined in the domain file if necessary, but do not assume any external information.
+
+        Output strictly in JSON format with the following structure:
+        {{
+            "df": "CONTENT_OF_THE_DOMAIN_FILE",
+            "pf": "CONTENT_OF_THE_PROBLEM_FILE"
+        }}
+    """
+    df, pf = run_llm_model(prompt, model_name=model_name)
+    return df, pf, None, prompt
+
+def merge_problem_files_llm(old_problem_file, new_problem_file, model_name="o3-mini"):
+    prompt = f"""
+        You have two problem files (PDDL). The old problem file:
+        <<<
+        {old_problem_file}
+        >>>
+
+        The new problem file based on the new observation:
+        <<<
+        {new_problem_file}
+        >>>
+
+        Merge them so that:
+        - You include any new objects or init facts from the new PF if they are truly new.
+        - You do not lose any critical old PF objects or init facts that are still valid.
+        - The final goal should reflect both ensuring the new place is discovered or consistent with your exploration aim.
+
+        Output strictly in JSON:
+        {{
+        "pf": "YOUR_FINAL_MERGED_PROBLEM_FILE"
+        }}
+    """
+
+    _df, merged_pf = run_llm_model(prompt, model_name=model_name)
+    return merged_pf
+
+def merge_problem_files_code(old_pf: str, new_pf: str) -> str:
+    # 1. Extract objects, init, goal from old_pf
+    old_objects = []
+    old_init = []
+    old_goal = []
+    # (Write your parser code for old_pf below or call an existing parser.)
+
+    # 2. Extract objects, init, goal from new_pf
+    new_objects = []
+    new_init = []
+    new_goal = []
+    # (Write your parser code for new_pf below.)
+
+    # 3. Merge objects
+    # For example, unify sets:
+    final_objects_set = set(old_objects) | set(new_objects)
+
+    # 4. Merge init
+    # For instance, unify sets again. Remove duplicates.
+    final_init_set = set(old_init) | set(new_init)
+
+    # 5. Choose or unify the goal
+    # If your approach is "always last known goal," or "union of old + new," do it here.
+    # For example, choose new PF's goal if you want the "latest location" to be the goal:
+    final_goal = new_goal if new_goal else old_goal
+
+    # 6. Rebuild the PF with the merged sections:
+    final_pf = f"""
+        (define (problem MergedProblem)
+        (:domain MyDomain)
+
+        (:objects
+            {' '.join(sorted(list(final_objects_set)))}
+        )
+
+        (:init
+            {"\n    ".join(sorted(list(final_init_set)))}
+        )
+
+        (:goal
+            {" ".join(final_goal)}
+        )
+        )
+    """
+
+    # Return the merged PF string
+    return final_pf
+# ==== Merging method helper functions (end) ====
+
 
 
 def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial = 0, end_trial = 11):
@@ -1060,10 +1006,8 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 f.write(f"\n\n====Step {step_id}==== \n")
 
             trial_step_record = []
-
             within_step_tries = 0
             action_passed = False
-
             large_loop_error_message = ""
 
             # Under step#, it should repeat until run all actions and found no error
@@ -1071,6 +1015,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 with open(file_name, "a") as f:
                     f.write(f'\n----Larger Loop No. {within_step_tries}---- \n') 
                     f.write(f'successful_actions: {successful_actions} \n')
+
                 within_step_tries += 1
 
                 if within_step_tries > 1: # second or third ... time in the larger loop
@@ -1404,6 +1349,7 @@ def run_baseline_model(model_name, start_trials, end_trials):
             writer = csv.writer(csvfile)
             writer.writerow(data_row)
 
+
 # Merging method: only observation generate problem files
 def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=11, merging_method="llm"):
     """
@@ -1427,8 +1373,8 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
     # If you have a stable domain file somewhere, you could define it here (or load from disk).
     # Otherwise, you can keep it empty and let your LLM create or fix it as well.
     # For demonstration, let's just say df is empty or set some minimal domain for the "open-door" & "move" actions:
-    df = ""  # or a minimal domain if you want
-    old_pf = ""  # We'll merge new PF into this each step
+    # df = ""  # or a minimal domain if you want
+    # old_pf = ""  # We'll merge new PF into this each step
 
     for trial in range(start_trial, end_trial):
         coin_found = False
@@ -1465,8 +1411,10 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
         # Some tracking variables
         action_queue = []
         obs_queue = []
-        successful_actions = []
+        df = ""
+        pf_to_merge = ""
         all_actions = []
+        successful_actions = []
         overall_memory = brief_obs
 
         end_game = False
@@ -1501,7 +1449,11 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
                 tem_memory = ""
                 start_checkpoint = True
 
+                # ---- Small loop starts ----
                 while start_checkpoint or action_queue:
+                    with open(file_name, "a") as f:
+                        f.write(f'Small Loop, action_queue: {action_queue} \n')
+
                     start_checkpoint = False
 
                     if not action_queue:
@@ -1510,51 +1462,44 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
                             brief_obs = "\n".join(obs_queue)
                             obs_queue = []
 
-                        # STEP A: Generate *new PF from the current observation*
-                        #        (not referencing old_pf directly).
-                        #        Then fix it in small loops (like your "fix" approach),
-                        #        or simply do repeated solver calls until we get a plan.
+                        num_tries = 0
 
-                        # 1) Generate new PF from the observation
-                        new_pf = generate_problem_file_from_observation(
+                        # Generate new PF from the observation
+                        df, pf, err, prompt = generate_problem_file_from_observation(
                             observation=brief_obs,
                             model_name=model_name,
-                            domain_file=df  # if you want to provide domain context
+                            domain_file=df  # Initially, df is an empty string
                         )
 
-                        # 2) Attempt to fix that new PF (like your large/small loop fix).
-                        #    We'll keep it simpler: check solver -> if fails, ask LLM to fix again, up to X times.
-                        fixed_pf = fix_problem_file_with_loops(df, new_pf, model_name=model_name, max_large_loops=3)
-
-                        # 3) Merge old PF with newly fixed PF
-                        #    Depending on merging_method
-                        if old_pf and fixed_pf:
-                            if merging_method == "llm":
-                                merged_pf = merge_problem_files_llm(old_problem_file=old_pf, new_problem_file=fixed_pf, model_name=model_name)
-                            else:
-                                merged_pf = merge_problem_files_code(old_pf, fixed_pf)
-                        else:
-                            # If it's the first time, there's no old_pf to merge
-                            merged_pf = fixed_pf
-
-                        # Now the "merged_pf" becomes our new PF for solving actions.
-                        # You can do the next solver call with domain_file=df, problem_file=merged_pf:
-                        action, err_2 = get_action_from_pddl(df, merged_pf)
-
-                        # Keep track of PF for next iteration
-                        old_pf = merged_pf
+                        action, err_2 = get_action_from_pddl(df, pf) # error 2 here
 
                         with open(file_name, "a") as f:
-                            f.write("=== Generated New PF from observation ===\n")
-                            f.write(f"New PF:\n{new_pf}\n\n")
-                            f.write("=== Fixed PF ===\n")
-                            f.write(f"{fixed_pf}\n\n")
-                            f.write("=== Merged PF ===\n")
-                            f.write(f"{merged_pf}\n\n")
-                            f.write(f"Actions from solver: {action}\n")
+                            f.write(f"--Small Loop--: {num_tries} \n")
+                            f.write(f"Error: {err} & {err_2} \n")
+                            f.write(f"Prompt: {prompt} \n") 
+                            f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
+                            f.write(f"Actions from solver(df, pf): {action} \n")
 
-                        # If no action can be found, let's end or keep iterating:
-                        trial_step_record.append([within_step_tries, "PF generation attempts"])
+                        while not action and num_tries < 5:
+                            df, pf, err, prompt = generate_problem_file_from_observation(
+                                observation=brief_obs,
+                                model_name=model_name,
+                                domain_file=df,
+                                err=err, 
+                                err_2=err_2
+                            )
+                            action, err_2 = get_action_from_pddl(df, pf)
+                            num_tries += 1
+
+                            with open(file_name, "a") as f:
+                                f.write(f"--Small Loop--: {num_tries} \n")
+                                f.write(f"Error: {err} & {err_2} \n")
+                                f.write(f"Prompt: {prompt} \n") 
+                                f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
+                                f.write(f"Actions from solver(df, pf): {action} \n")
+                        
+                        trial_step_record.append([within_step_tries, num_tries])
+
                         if not action:
                             end_game = True
                             break
@@ -1610,11 +1555,27 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
                         action_passed = True
                         overall_memory += tem_memory
                         successful_actions.extend(tem_action_queue)
+                # ---- End small loop ----
+
 
                 # End condition if we used up too many tries or found coin
                 if (within_step_tries == 5 and not action_passed) or end_game:
                     end_game = True
                     break
+            # ---- End Large loop ----
+
+            # After BOTH the small loop and large loop finish successfully, merge the new PF.
+            if action_passed:
+                if pf_to_merge and pf:
+                    print('**** merging old with new generated')
+                    if merging_method == "llm":
+                        merged_pf = merge_problem_files_llm(old_problem_file=pf_to_merge, new_problem_file=pf, model_name=model_name)
+                    else:
+                        merged_pf = merge_problem_files_code(pf_to_merge, pf)
+                else:
+                    print('**** Directly using the first pf')
+                    merged_pf = pf
+                pf_to_merge = merged_pf
 
             trial_record.append(trial_step_record)
             if end_game:
@@ -1637,16 +1598,16 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 # Run baseline models
 # run_baseline_model("gpt-4o-mini-2024-07-18", 0, 2)
-# run_baseline_model("o3-mini", 0, 10)
+# run_baseline_model("o3-mini-2025-01-31", 0, 10)
 # run_baseline_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 3, 10) # models--google--gemma-2-27b-it
 # run_baseline_model("google/gemma-2-27b-it", 0, 10)
 
 
 # Run PDDL generation models
-# run_iterative_model("o3-mini", 0, 11) # gpt-4o; o3-mini
+# run_iterative_model("o3-mini-2025-01-31", 0, 2) # gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
 
 
 
-run_merging_pf_model("gpt-4o-mini-2024-07-18", 0, 3, merging_method="llm")
+run_merging_pf_model("o3-mini-2025-01-31", 0, 3, merging_method="llm")
