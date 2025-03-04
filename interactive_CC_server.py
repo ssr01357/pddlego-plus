@@ -1797,4 +1797,5 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 
 
-run_merging_pf_model("gpt-4o-2024-05-13", 0, 6, merging_method="llm")
+# run_merging_pf_model("gpt-4o-2024-05-13", 3, 6, merging_method="llm")
+run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")
