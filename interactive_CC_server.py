@@ -19,6 +19,7 @@ import os
 client = OpenAI()
 # os.environ["OPENAI_API_KEY"] = ""
 
+
 # Solver set up
 def run_solver(domain_file, problem_file, solver):
     # domain_file = open(f'domain.pddl').read()
@@ -46,6 +47,7 @@ def get_action_from_pddl(df, pf):
     action = result['output']['plan']
     err_2 = result['stderr']
     return map_actions(action), err_2
+
 
 # LLM set up
 close_source_model_lists = ['o3-mini', 'gpt-4o', 'gpt-4o-2024-05-13', 'o3-mini-2025-01-31']
@@ -278,7 +280,6 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
     """
     actions = run_gpt_for_actions_baseline(prompt, model_name)
     return actions
-
 
 
 # VAL setup
@@ -651,8 +652,6 @@ def llm_to_pddl_check_delta(obs, taken_action, prev_df="", prev_pf=""):
     return False, df, pf
 
 
-
-
 # Prompt modify and main function
 env = TextWorldExpressEnv(envStepLimit=100)
 NUM_LOCATIONS = 11
@@ -800,48 +799,9 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     # ....
     return df, pf, err, prompt
 
+
 # ==== Merging method helper functions ====
 # Merging method: Without previous problem file but only feeding observations
-# def generate_problem_file_from_observation(observation, model_name="o3-mini", domain_file="", err="", err_2=""):
-#     prompt = f"""You are in an environment that you explore step by step. Your job is to build and update the PDDL files (both the domain file and the problem file) strictly based on your observations—do not add information that has not been observed. In particular:
-#         - Do not invent objects or rooms that are not mentioned in the observations.
-#         - If you see a closed door, assume there may be a room behind it—but only include it if supported by the observation.
-#         - Do not assume a door connects two rooms unless it is clearly observed.
-#         - Your overall goal is to keep exploring and reach a location that has not yet been visited.
-
-#         You have the following valid actions available (and you must follow these exactly):
-#         1. **:action open-door**  
-#         :parameters (?loc1 - location ?loc2 - location ?dir - direction)
-#         2. **:action move**  
-#         :parameters (?from - location ?to - location ?dir - direction)
-
-#         Additionally, your problem file must include a goal section exactly in this format:
-#         (:goal (at ?location) )
-
-#         where “?location” is replaced with a location that has not been visited.
-
-#         The current domain file is provided here: {domain_file}
-#         - If this domain file is empty, first build a PDDL domain file from scratch.
-#         - If the domain file is not empty, check and, if necessary, revise it according to your understanding or the following error messages: {err} and {err_2}.
-
-#         Now, you are tasked with building a PDDL **problem file** from scratch based solely on the following observation:
-#         {observation}
-#         *Note: You do not have access to any previous problem file.*
-
-#         Your goals for generating the problem file are:
-#         - Include only the relevant objects, initial states, and goals that directly reflect this observation.
-#         - Ensure the problem file is self-contained (i.e., it must include the sections (:objects ...), (:init ...), and (:goal ...)).
-#         - Use the objects or actions defined in the domain file if necessary, but do not assume any external information.
-
-#         Output strictly in JSON format with the following structure:
-#         {{
-#             "df": "CONTENT_OF_THE_DOMAIN_FILE",
-#             "pf": "CONTENT_OF_THE_PROBLEM_FILE"
-#         }}
-#     """
-#     df, pf = run_llm_model(prompt, model_name=model_name)
-#     return df, pf, None, prompt
-
 def generate_problem_file_from_observation(observation, model_name="o3-mini", domain_file="", err="", err_2=""):
     prompt = f"""
         You are in an environment that you explore step by step. Your job is to build a PDDL problem file strictly based on your current observation—do not add information that has not been observed. In particular:
@@ -875,7 +835,6 @@ def generate_problem_file_from_observation(observation, model_name="o3-mini", do
     # Assuming run_llm_model returns a dict with key "pf"
     pf = result.get("pf") if isinstance(result, dict) else result[1]
     return pf
-
 
 def merge_problem_files_llm(old_problem_file, new_problem_file, model_name="o3-mini"):
     prompt = f"""
@@ -953,7 +912,7 @@ def merge_problem_files_code(old_pf: str, new_pf: str) -> str:
 # ==== Merging method helper functions (end) ====
 
 
-
+# Main functions here:
 def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial = 0, end_trial = 11):
     # trial_record = 
     # structured_info_record = "output/summary"
@@ -1783,19 +1742,19 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
             writer = csv.writer(csvfile)
             writer.writerow(data_row)
 
-# Run baseline models
+## Run baseline models
 # run_baseline_model("gpt-4o-mini-2024-07-18", 0, 2)
 # run_baseline_model("o3-mini-2025-01-31", 0, 10)
 # run_baseline_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 3, 10) # models--google--gemma-2-27b-it
 # run_baseline_model("google/gemma-2-27b-it", 0, 10)
 
 
-# Run PDDL generation models
+## Run PDDL generation models
 # run_iterative_model("o3-mini-2025-01-31", 0, 2) # gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
 
 
-
+## Run pf merging models
 # run_merging_pf_model("gpt-4o-2024-05-13", 3, 6, merging_method="llm")
 run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")
