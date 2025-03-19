@@ -1214,7 +1214,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             if end_game:
                 break
         
-        with open("output/results.csv", "a", newline="") as csvfile:
+        with open("output/alfworld_results.csv", "a", newline="") as csvfile:
             # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
             data_row = [today, model_name, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
             writer = csv.writer(csvfile)
@@ -1605,7 +1605,7 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 
 ## Run PDDL generation models
-run_iterative_model("o3-mini-2025-01-31", 1, 2) # gpt-4o; o3-mini
+run_iterative_model("o3-mini-2025-01-31", 2, 3) # gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
 
