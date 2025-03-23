@@ -1,37 +1,38 @@
 import sys
-print(sys.path)
-
+# print(sys.path)
+print(0)
 import time
 from datetime import date
 import csv
 import json
 import asyncio
 import re
-
+print(0.4)
 ## module for server
 # from kani import Kani
 # from kani.engines.huggingface import HuggingEngine
-
-import subprocess
+print('hi')
+# import subprocess
 import requests
-
+print(0.7)
 from textworld_express import TextWorldExpressEnv
-
+print(0.8)
 import os
 import json
 import glob
 import random
 import argparse
 from os.path import join as pjoin
-
+print(0.9)
 import textworld
 import textworld.gym
 
+print(1)
 from alfworld.info import ALFWORLD_DATA
 from alfworld.agents.utils.misc import add_task_to_grammar
 from alfworld.agents.environment.alfred_tw_env import AlfredExpert, AlfredDemangler, AlfredExpertType
 
-
+print(2)
 from openai import OpenAI
 import os
 
@@ -39,7 +40,7 @@ import os
 client = OpenAI()
 # os.environ["OPENAI_API_KEY"] = ""
 
-
+print('after import')
 # Solver set up
 def run_solver(domain_file, problem_file, solver):
     # domain_file = open(f'domain.pddl').read()
@@ -64,6 +65,7 @@ def run_solver(domain_file, problem_file, solver):
 def get_action_from_pddl(df, pf):
     # run_fast_downward(path_to_df, path_to_pf)
     result = run_solver(df, pf, "dual-bfws-ffparser")
+    print(result)
     action = result['output']['plan']
     err_2 = result['stderr']
     return map_actions(action), err_2
@@ -325,32 +327,32 @@ def plan_to_path(plan, plan_filename="plan.txt"):
 
     return path_to_plan
 
-def run_pddl_parser(domain_file, problem_file=None):
-    # Define the path to your Parser executable
-    parser_path = "VAL-master/build/macos64/Release/bin/Parser"
-    domain_path, problem_path = file_to_path(domain_file, problem_file)
+# def run_pddl_parser(domain_file, problem_file=None):
+#     # Define the path to your Parser executable
+#     parser_path = "VAL-master/build/macos64/Release/bin/Parser"
+#     domain_path, problem_path = file_to_path(domain_file, problem_file)
     
-    # Check if both domain and problem files are provided
-    if problem_file:
-        command = [parser_path, domain_path, problem_path]
-    else:
-        command = [parser_path, domain_path]
+#     # Check if both domain and problem files are provided
+#     if problem_file:
+#         command = [parser_path, domain_path, problem_path]
+#     else:
+#         command = [parser_path, domain_path]
     
-    try:
-        # Run the Parser and capture the output
-        result = subprocess.run(command, capture_output=True, text=True)
+#     try:
+#         # Run the Parser and capture the output
+#         result = subprocess.run(command, capture_output=True, text=True)
         
-        # Check if there is any error
-        if result.returncode != 0:
-            print(f"Error: {result.stderr}")
-            return None
+#         # Check if there is any error
+#         if result.returncode != 0:
+#             print(f"Error: {result.stderr}")
+#             return None
         
-        # Return the stdout (output) of the parser
-        return result.stdout
+#         # Return the stdout (output) of the parser
+#         return result.stdout
     
-    except FileNotFoundError as e:
-        print(f"Parser not found: {e}")
-        return None
+#     except FileNotFoundError as e:
+#         print(f"Parser not found: {e}")
+#         return None
 
 def validate_pddl(domain_file, problem_file, plan=None):
     # The path to the Validate executable
@@ -674,11 +676,14 @@ def llm_to_pddl_check_delta(obs, taken_action, prev_df="", prev_pf=""):
 
 ### ========= Alfworld =========
 # choose a problem to solve
+print('before setting up')
 problems = glob.glob(pjoin(ALFWORLD_DATA, "**", "initial_state.pddl"), recursive=True)
+print('find problems')
 problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
-problem = os.path.dirname(random.choice(problems)) # random select one problem
+# problem = os.path.dirname(random.choice(problems)) # random select one problem
+problem = os.path.dirname(problems[1])
 print(f"Playing {problem}")
 
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
@@ -783,15 +788,58 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     """
 
     prompt_obs_action = f"""
-        You are in an environment that you explore step by step. You must build and update PDDL files of the environment based on only your observations. 
-        Do not create something not appeared in the observations and also do not miss any observations.
-        You are in a room with different objects. Some objects are on/in other objects and receptacles. Your job is to compete the given task.
+        You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
 
-        The following actions are allowed: go to a location, open an object/receptacle, close an object/receptacle, take an object from another object/receptacle, put object into/on/in another object/receptacle, check inventory, examine an object/receptacle, using an object/receptacle by turning it on/off with a switch, heat an object with another object/receptacle, clean an object with another object/receptacle, cool an object with another object/receptacle, slice an object with another object/receptacle, and look around.
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles.
+        
+        The following actions are allowed: 
+        1. go to a location
+            :action GotoLocation
+            :parameters (?a - agent ?lStart - location ?lEnd - location ?r - receptacle)
+        2. open an object/receptacle
+            :action OpenObject
+            :parameters (?a - agent ?l - location ?r - receptacle)
+        3. close an object/receptacle
+            :action CloseObject
+            :parameters (?a - agent ?l - location ?r - receptacle)
+        4. take an object from another object/receptacle
+            :action PickupObject
+            :parameters (?a - agent ?l - location ?o - object ?r - receptacle)
+        5. put object into/on/in another object/receptacle
+            :action PutObject
+            :parameters (?a - agent ?l - location ?o - object ?r - receptacle ?ot - otype ?rt - rtype)
+        6. check inventory
+        7. examine an object/receptacle
+            :action examineReceptacle
+            :parameters (?a - agent ?r - receptacle)
+        8. using an object/receptacle by turning it on/off with a switch
+        9. heat an object with another object/receptacle
+            :action HeatObject
+            :parameters (?a - agent ?l - location ?r - receptacle ?o - object)
+        10. clean an object with another object/receptacle
+            :action CleanObject
+            :parameters (?a - agent ?l - location ?r - receptacle ?o - object)
+        11. cool an object with another object/receptacle
+            :action CoolObject
+            :parameters (?a - agent ?l - location ?r - receptacle ?o - object)
+        12. slice an object with another object/receptacle
+            :action SliceObject
+            :parameters (?a - agent ?l - location ?co - object ?ko - object)
+        13. look around.
 
         You must go to a location in order to use it or take/put objects on it.
 
         Now, {goal}
+
+        There should have two stages:
+        1. You should first find this objects by keeping exploration and going to a location you have not visited yet. 
+        In other words, initially, your objective is to explore new locations until you discover the object mentioned in the task.
+            (:goal 
+                (at ?location)
+            ) where location should be somewhere not visited
+
+        2. Once you have located the object, update your goal to use the object to complete the task.
+
         Here are your current observations: {brief_obs}
     """ 
 

@@ -16,6 +16,7 @@ from alfworld.agents.environment.alfred_tw_env import AlfredExpert, AlfredDemang
 
 
 def main(args):
+    print(123)
     outputs = []
 
     outputs.append(f"Playing '{args.problem}'.")
@@ -55,6 +56,7 @@ def main(args):
     )
     env = textworld.gym.make(env_id)
 
+    print(234)
     # reset环境
     obs, infos = env.reset()
     # print(obs.split('\n'))
@@ -104,6 +106,7 @@ if __name__ == "__main__":
                         help="Path to a TWL2 file defining the grammar used to generate text feedbacks."
                              " Default: `%(default)s`.")
     args = parser.parse_args()
+    print('after args')
 
     if args.problem is None:
         problems = glob.glob(pjoin(ALFWORLD_DATA, "**", "initial_state.pddl"), recursive=True)
