@@ -1,46 +1,39 @@
 import sys
 # print(sys.path)
-print(0)
 import time
 from datetime import date
 import csv
 import json
 import asyncio
 import re
-print(0.4)
+
 ## module for server
 # from kani import Kani
 # from kani.engines.huggingface import HuggingEngine
-print('hi')
-# import subprocess
+
+import subprocess
 import requests
-print(0.7)
-from textworld_express import TextWorldExpressEnv
-print(0.8)
+
 import os
 import json
 import glob
 import random
 import argparse
 from os.path import join as pjoin
-print(0.9)
+
+from textworld_express import TextWorldExpressEnv
 import textworld
 import textworld.gym
 
-print(1)
 from alfworld.info import ALFWORLD_DATA
 from alfworld.agents.utils.misc import add_task_to_grammar
 from alfworld.agents.environment.alfred_tw_env import AlfredExpert, AlfredDemangler, AlfredExpertType
 
-print(2)
 from openai import OpenAI
-import os
-
 
 client = OpenAI()
 # os.environ["OPENAI_API_KEY"] = ""
 
-print('after import')
 # Solver set up
 def run_solver(domain_file, problem_file, solver):
     # domain_file = open(f'domain.pddl').read()
@@ -327,32 +320,32 @@ def plan_to_path(plan, plan_filename="plan.txt"):
 
     return path_to_plan
 
-# def run_pddl_parser(domain_file, problem_file=None):
-#     # Define the path to your Parser executable
-#     parser_path = "VAL-master/build/macos64/Release/bin/Parser"
-#     domain_path, problem_path = file_to_path(domain_file, problem_file)
+def run_pddl_parser(domain_file, problem_file=None):
+    # Define the path to your Parser executable
+    parser_path = "VAL-master/build/macos64/Release/bin/Parser"
+    domain_path, problem_path = file_to_path(domain_file, problem_file)
     
-#     # Check if both domain and problem files are provided
-#     if problem_file:
-#         command = [parser_path, domain_path, problem_path]
-#     else:
-#         command = [parser_path, domain_path]
+    # Check if both domain and problem files are provided
+    if problem_file:
+        command = [parser_path, domain_path, problem_path]
+    else:
+        command = [parser_path, domain_path]
     
-#     try:
-#         # Run the Parser and capture the output
-#         result = subprocess.run(command, capture_output=True, text=True)
+    try:
+        # Run the Parser and capture the output
+        result = subprocess.run(command, capture_output=True, text=True)
         
-#         # Check if there is any error
-#         if result.returncode != 0:
-#             print(f"Error: {result.stderr}")
-#             return None
+        # Check if there is any error
+        if result.returncode != 0:
+            print(f"Error: {result.stderr}")
+            return None
         
-#         # Return the stdout (output) of the parser
-#         return result.stdout
+        # Return the stdout (output) of the parser
+        return result.stdout
     
-#     except FileNotFoundError as e:
-#         print(f"Parser not found: {e}")
-#         return None
+    except FileNotFoundError as e:
+        print(f"Parser not found: {e}")
+        return None
 
 def validate_pddl(domain_file, problem_file, plan=None):
     # The path to the Validate executable
@@ -676,14 +669,13 @@ def llm_to_pddl_check_delta(obs, taken_action, prev_df="", prev_pf=""):
 
 ### ========= Alfworld =========
 # choose a problem to solve
-print('before setting up')
 problems = glob.glob(pjoin(ALFWORLD_DATA, "**", "initial_state.pddl"), recursive=True)
-print('find problems')
+
 problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
-problem = os.path.dirname(problems[1])
+problem = os.path.dirname(problems[1]) # select a specific problem to test
 print(f"Playing {problem}")
 
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")

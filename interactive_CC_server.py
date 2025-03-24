@@ -5,8 +5,8 @@ import json
 import asyncio
 import re
 
-from kani import Kani
-from kani.engines.huggingface import HuggingEngine
+# from kani import Kani
+# from kani.engines.huggingface import HuggingEngine
 
 import subprocess
 import requests
@@ -1757,4 +1757,4 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 ## Run pf merging models
 # run_merging_pf_model("gpt-4o-2024-05-13", 3, 6, merging_method="llm")
-run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")
+# run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")
