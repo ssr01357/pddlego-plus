@@ -401,15 +401,37 @@ def summarize_obs(obs):
         return obs.split('\n')[0].split(". ")[0] + ". " + obs.split('\n')[1]
 
 ### === keep modifying this === ###
-def map_actions(action): # (GOTOLOCATION AGENT1 NEW_LOCATION TOWELHOLDER1)\n
+def map_actions(action):
     actions = action.lower().replace("(", "").replace(")", "").split('\n')
     action_lst = []
     for act in actions:
-        if "gotolocation" in act:
+        if "gotolocation" in act: # '(GOTOLOCATION AGENT1 NEW_LOCATION TOWELHOLDER1)\n' => ['go to towelholder 1']
             location = act.split(' ')[-1]
             # Insert a space between non-digits and digits, e.g., "towelholder1" -> "towelholder 1"
             formatted_location = re.sub(r"(\D+)(\d+)", r"\1 \2", location)
             action_lst.append(f"go to {formatted_location}")
+        elif "openobject" in act: # '(OPENOBJECT CABINET4)\n' => ['open cabinet 4']
+            object_ = act.split(' ')[-1]
+            formatted_object = re.sub(r"(\D+)(\d+)", r"\1 \2", object_)
+            action_lst.append(f"open {formatted_object}")
+        elif "pickupobject" in act:  # '(PICKUPOBJECT CLOTH1 CABINET4)' => ['take cloth 1 from cabinet 4']
+            parts = act.split()
+            # Expecting parts: ['pickupobject', 'cloth1', 'cabinet4']
+            if len(parts) >= 3:
+                obj = parts[1]
+                container = parts[2]
+                formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
+                formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
+                action_lst.append(f"take {formatted_obj} from {formatted_container}")
+        # elif : # '(PUTOBJECT CLOTH1 BATHTUBBASIN1)\n' => ['move cloth 1 to bathtubbasin 1']
+        elif "putobject" in act:  # e.g., '(PUTOBJECT CLOTH1 BATHTUBBASIN1)' => ['move cloth 1 to bathtubbasin 1']
+            parts = act.split()
+            if len(parts) >= 3:
+                obj = parts[1]
+                container = parts[2]
+                formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
+                formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
+                action_lst.append(f"move {formatted_obj} to {formatted_container}")
     if len(action_lst) == 0:
         return None
     return action_lst
@@ -791,19 +813,19 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         The following actions are allowed: 
         1. go to a location
             :action GotoLocation
-            :parameters (?l - location ?r - receptacle)
-        2. open an object/receptacle
+            :parameters (?from - location ?to - location)
+        2. open an object/receptacle if it is closed
             :action OpenObject
-            :parameters (?l - location ?r - receptacle)
+            :parameters (?r - receptacle)
         3. close an object/receptacle
             :action CloseObject
-            :parameters (?l - location ?r - receptacle)
+            :parameters (?r - receptacle)
         4. take an object from another object/receptacle
             :action PickupObject
-            :parameters (?l - location ?o - object ?r - receptacle)
+            :parameters (?o - object ?r - receptacle)
         5. put object into/on/in another object/receptacle
             :action PutObject
-            :parameters (?l - location ?o - object ?r - receptacle ?ot - otype ?rt - rtype)
+            :parameters (?o - object ?r - receptacle)
         6. check inventory
         7. examine an object/receptacle
             :action examineReceptacle
@@ -825,19 +847,32 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
 
         You must go to a location in order to use it or take/put objects on it.
 
-        There should have two stages:
-        1. You should first find this objects by keeping exploration and going to a location you have not visited yet. 
-        In other words, initially, your objective is to explore new locations until you discover the object mentioned in the task.
-        In this first stage, you may only use action GotoLocation to explore new locations and OpenObject if it is closed to check if that object is what we want.
-            (:goal 
-                (at ?location)
-            ) where location should be somewhere not visited
-            (:goal 
-                (opened ?location)
-            ) if the visited location is closed and you need to open it to check the object
-        After you go the that location and found the object in it, you can update your goal to stage two.
+        The process involves two main stages:
 
-        2. Once you have located the object, update your goal to use the object to complete the task.
+        1. Searching for the Object:
+            In this stage, your goal is to explore new, unvisited locations until you find the object mentioned in the task. You can only use the GotoLocation action to travel to a new location and the OpenObject action (if the location is closed) to verify whether it contains the target object.
+
+            Goal 1.1: Reach a location that has not been visited (the location should be a receptacle) using the GotoLocation action. 
+                You goal should look like this:
+                (:goal 
+                    (at ?location)
+                ) where location should be somewhere or some recepatacle not visited.
+
+            Goal 1.2: If you already go to the recepatacle and found the recepatacle is closed, use the OpenObject action to open it and inspect the contents. 
+                Your goal should look like this:
+                (:goal 
+                    (opened ?recepatacle)
+                ) where recepatacle should be the recepatacle you want to open.
+
+        2. Using the Object to Complete the Task:
+            Once you have found the object, update your goal to focus on using it to complete the task.
+            You need to first use the PickupObject action to take the object from a receptacle, then go to the aiming location by using GotoLocation action, and then put it into another receptacle.
+            Or use it in some other way to complete the task.
+
+        In summary, the first stage is all about finding the object—this might involve traveling to a location and opening it if necessary.
+        
+        Note, some receptacles have numbers in their names. Always keep them as they are. For example, "towelholder1" should not be changed to "towelholder".
+        Your initial goal should always be to go to a new location instead of put something into somewhere.
     """ 
 
     prompt_prev_files = f"""
@@ -910,67 +945,67 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
 
 # ==== Merging method helper functions ====
 # Merging method: Without previous problem file but only feeding observations
-def generate_problem_file_from_observation(observation, model_name="o3-mini", domain_file="", err="", err_2=""):
-    prompt = f"""
-        You are in an environment that you explore step by step. Your job is to build a PDDL problem file strictly based on your current observation—do not add information that has not been observed. In particular:
-        - Do not invent objects or rooms that are not mentioned.
-        - Do not omit any details from the observation. Be sure to include every item you observed, such as any closed door or room on one direction.
-        - Include only the relevant objects, initial states, and goals that directly reflect this observation.
-        - The problem file must be self-contained with the sections (:objects ...), (:init ...), and (:goal ...).
-        - Your valid actions are exactly:
-            1. :action open-door  
-            :parameters (?loc1 - location ?loc2 - location ?dir - direction)
-            2. :action move  
-            :parameters (?from - location ?to - location ?dir - direction)
-        - The goal must be in the format:
-            (:goal (at ?location))
-        where “?location” is a location that has not yet been visited.
+# def generate_problem_file_from_observation(observation, model_name="o3-mini", domain_file="", err="", err_2=""):
+#     prompt = f"""
+#         You are in an environment that you explore step by step. Your job is to build a PDDL problem file strictly based on your current observation—do not add information that has not been observed. In particular:
+#         - Do not invent objects or rooms that are not mentioned.
+#         - Do not omit any details from the observation. Be sure to include every item you observed, such as any closed door or room on one direction.
+#         - Include only the relevant objects, initial states, and goals that directly reflect this observation.
+#         - The problem file must be self-contained with the sections (:objects ...), (:init ...), and (:goal ...).
+#         - Your valid actions are exactly:
+#             1. :action open-door  
+#             :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+#             2. :action move  
+#             :parameters (?from - location ?to - location ?dir - direction)
+#         - The goal must be in the format:
+#             (:goal (at ?location))
+#         where “?location” is a location that has not yet been visited.
 
-        You are given the following domain file as context (if provided):
-        {domain_file}
-        If it is empty, ignore this context.
+#         You are given the following domain file as context (if provided):
+#         {domain_file}
+#         If it is empty, ignore this context.
 
-        Now, build a PDDL **problem file** solely based on this observation:
-        {observation}
-        *Note: You do not have access to any previous problem file.*
+#         Now, build a PDDL **problem file** solely based on this observation:
+#         {observation}
+#         *Note: You do not have access to any previous problem file.*
 
-        Output strictly in JSON format with the following structure:
-        {{
-            "pf": "CONTENT_OF_THE_PROBLEM_FILE"
-        }}
-    """
-    result = run_llm_model(prompt, model_name=model_name)
-    # Assuming run_llm_model returns a dict with key "pf"
-    pf = result.get("pf") if isinstance(result, dict) else result[1]
-    return pf
+#         Output strictly in JSON format with the following structure:
+#         {{
+#             "pf": "CONTENT_OF_THE_PROBLEM_FILE"
+#         }}
+#     """
+#     result = run_llm_model(prompt, model_name=model_name)
+#     # Assuming run_llm_model returns a dict with key "pf"
+#     pf = result.get("pf") if isinstance(result, dict) else result[1]
+#     return pf
 
-def merge_problem_files_llm(old_problem_file, new_problem_file, model_name="o3-mini"):
-    prompt = f"""
-        You have two problem files (PDDL). The old problem file:
-        <<<
-        {old_problem_file}
-        >>>
+# def merge_problem_files_llm(old_problem_file, new_problem_file, model_name="o3-mini"):
+#     prompt = f"""
+#         You have two problem files (PDDL). The old problem file:
+#         <<<
+#         {old_problem_file}
+#         >>>
 
-        The new problem file based on the new observation:
-        <<<
-        {new_problem_file}
-        >>>
+#         The new problem file based on the new observation:
+#         <<<
+#         {new_problem_file}
+#         >>>
 
-        Merge them so that:
-        - You include any new objects or init facts from the new PF if they are truly new.
-        - You do not lose any critical old PF objects or init facts that are still valid.
-        - The final goal should reflect both ensuring the new place is discovered or consistent with your exploration aim.
+#         Merge them so that:
+#         - You include any new objects or init facts from the new PF if they are truly new.
+#         - You do not lose any critical old PF objects or init facts that are still valid.
+#         - The final goal should reflect both ensuring the new place is discovered or consistent with your exploration aim.
 
-        Output strictly in JSON:
-        {{
-        "pf": "YOUR_FINAL_MERGED_PROBLEM_FILE"
-        }}
-    """
+#         Output strictly in JSON:
+#         {{
+#         "pf": "YOUR_FINAL_MERGED_PROBLEM_FILE"
+#         }}
+#     """
 
-    _df, merged_pf = run_llm_model(prompt, model_name=model_name)
-    return merged_pf
+#     _df, merged_pf = run_llm_model(prompt, model_name=model_name)
+#     return merged_pf
 
-def merge_problem_files_code(old_pf: str, new_pf: str) -> str:
+# def merge_problem_files_code(old_pf: str, new_pf: str) -> str:
     # 1. Extract objects, init, goal from old_pf
     old_objects = []
     old_init = []
@@ -1216,7 +1251,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     obs, reward, done, infos = env.step(taken_action)
 
                     # Directly end the game if Done!
-                    if done:
+                    if infos["won"]:
                         # taken_action = "take coin"
                         # obs, reward, done, infos = env.step(taken_action)
                         end_game = True
@@ -1237,6 +1272,8 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         f.write(f"> {taken_action} \n {brief_obs} \n")
 
                     if "Nothing happens." in brief_obs:
+                        # if "xx" in taken_action:
+                        #     large_loop_error_message = ""
                         large_loop_error_message = f"This is the action you take: {taken_action}. \
                             But nothing happens. You should try another action!"
                         break
@@ -1266,176 +1303,176 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             writer.writerow(data_row)
 
 
-def run_baseline_model(model_name, start_trials, end_trials):
-    for trial in range(start_trials, end_trials):
-        coin_found = False
-        today = date.today()
-        file_name = f"output/06_021425_baseline/{today}_{model_name.replace('/','_')}_{trial}.txt"
-        trial_record = []  # This will be a list of steps; each step is a list of large-loop iteration numbers
+# def run_baseline_model(model_name, start_trials, end_trials):
+#     for trial in range(start_trials, end_trials):
+#         coin_found = False
+#         today = date.today()
+#         file_name = f"output/06_021425_baseline/{today}_{model_name.replace('/','_')}_{trial}.txt"
+#         trial_record = []  # This will be a list of steps; each step is a list of large-loop iteration numbers
 
-        env = TextWorldExpressEnv(envStepLimit=100)
-        NUM_LOCATIONS = 11
-        env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-        obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-        with open(file_name, "a") as f:
-            f.write(f"Observations: {obs} \n")
-            f.write(f"Gold path: {env.getGoldActionSequence()} \n")
-            f.write(f"Valid Actions: {infos['validActions']} \n")
-            f.write(f"taskDescription: {infos['taskDescription']} \n")
+#         env = TextWorldExpressEnv(envStepLimit=100)
+#         NUM_LOCATIONS = 11
+#         env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+#         obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+#         with open(file_name, "a") as f:
+#             f.write(f"Observations: {obs} \n")
+#             f.write(f"Gold path: {env.getGoldActionSequence()} \n")
+#             f.write(f"Valid Actions: {infos['validActions']} \n")
+#             f.write(f"taskDescription: {infos['taskDescription']} \n")
 
-        valid_actions = sorted(infos['validActions'])
-        if 'look around' in valid_actions:
-            valid_actions.remove('look around')
-        if 'inventory' in valid_actions:
-            valid_actions.remove('inventory')
+#         valid_actions = sorted(infos['validActions'])
+#         if 'look around' in valid_actions:
+#             valid_actions.remove('look around')
+#         if 'inventory' in valid_actions:
+#             valid_actions.remove('inventory')
 
-        MAX_STEPS = 20
-        brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
-        with open(file_name, "a") as f:
-            f.write(f"brief_obs: {brief_obs} \n")
+#         MAX_STEPS = 20
+#         brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
+#         with open(file_name, "a") as f:
+#             f.write(f"brief_obs: {brief_obs} \n")
 
-        action_queue = []
-        obs_queue = []
-        all_actions = []
-        successful_actions = []
-        overall_memory = brief_obs
-        overall_memory_dic = []  # For recording detailed memory if needed
-        end_game = False
+#         action_queue = []
+#         obs_queue = []
+#         all_actions = []
+#         successful_actions = []
+#         overall_memory = brief_obs
+#         overall_memory_dic = []  # For recording detailed memory if needed
+#         end_game = False
 
-        for step_id in range(MAX_STEPS):
-            with open(file_name, "a") as f:
-                f.write(f"\n\n====Step {step_id}==== \n")
-            trial_step_record = []  # This will record each large-loop try for the current step
-            within_step_tries = 0
-            action_passed = False
-            large_loop_error_message = ""
+#         for step_id in range(MAX_STEPS):
+#             with open(file_name, "a") as f:
+#                 f.write(f"\n\n====Step {step_id}==== \n")
+#             trial_step_record = []  # This will record each large-loop try for the current step
+#             within_step_tries = 0
+#             action_passed = False
+#             large_loop_error_message = ""
 
-            # Under each step, try up to 5 large-loop iterations until actions pass.
-            while within_step_tries < 5 and not action_passed:
-                with open(file_name, "a") as f:
-                    f.write(f"\n----Larger Loop No. {within_step_tries}---- \n")
-                    f.write(f"successful_actions: {successful_actions} \n")
-                within_step_tries += 1
+#             # Under each step, try up to 5 large-loop iterations until actions pass.
+#             while within_step_tries < 5 and not action_passed:
+#                 with open(file_name, "a") as f:
+#                     f.write(f"\n----Larger Loop No. {within_step_tries}---- \n")
+#                     f.write(f"successful_actions: {successful_actions} \n")
+#                 within_step_tries += 1
 
-                if within_step_tries > 1:  # For subsequent tries, reset the environment
-                    env = TextWorldExpressEnv(envStepLimit=100)
-                    NUM_LOCATIONS = 11
-                    env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-                    obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-                    for act in successful_actions:
-                        obs, reward, done, infos = env.step(act)
+#                 if within_step_tries > 1:  # For subsequent tries, reset the environment
+#                     env = TextWorldExpressEnv(envStepLimit=100)
+#                     NUM_LOCATIONS = 11
+#                     env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+#                     obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+#                     for act in successful_actions:
+#                         obs, reward, done, infos = env.step(act)
 
-                # Reset action queues and temporary memory for this large-loop iteration.
-                action_queue = []
-                tem_action_queue = []
-                tem_memory = ""
+#                 # Reset action queues and temporary memory for this large-loop iteration.
+#                 action_queue = []
+#                 tem_action_queue = []
+#                 tem_memory = ""
 
-                start_checkpoint = True
-                while start_checkpoint or action_queue:
-                    with open(file_name, "a") as f:
-                        f.write(f"Small Loop, action_queue: {action_queue} \n")
-                    start_checkpoint = False
+#                 start_checkpoint = True
+#                 while start_checkpoint or action_queue:
+#                     with open(file_name, "a") as f:
+#                         f.write(f"Small Loop, action_queue: {action_queue} \n")
+#                     start_checkpoint = False
 
-                    if not action_queue:
-                        if obs_queue:
-                            brief_obs = "\n".join(obs_queue)
-                            obs_queue = []
-                        # Generate actions using the baseline LLM function.
-                        actions = llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory, large_loop_error_message)
-                        with open(file_name, "a") as f:
-                            f.write(f"Generated actions: {actions} \n")
+#                     if not action_queue:
+#                         if obs_queue:
+#                             brief_obs = "\n".join(obs_queue)
+#                             obs_queue = []
+#                         # Generate actions using the baseline LLM function.
+#                         actions = llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory, large_loop_error_message)
+#                         with open(file_name, "a") as f:
+#                             f.write(f"Generated actions: {actions} \n")
 
-                        if actions:
-                            action_queue.extend(actions)
-                            tem_action_queue.extend(actions)
-                            all_actions.extend(actions)
-                        else:
-                            end_game = True
-                            break
+#                         if actions:
+#                             action_queue.extend(actions)
+#                             tem_action_queue.extend(actions)
+#                             all_actions.extend(actions)
+#                         else:
+#                             end_game = True
+#                             break
 
-                    with open(file_name, "a") as f:
-                        f.write(f"Current action_queue: {action_queue} \n")
-                    taken_action = action_queue.pop(0)
-                    obs, reward, done, infos = env.step(taken_action)
+#                     with open(file_name, "a") as f:
+#                         f.write(f"Current action_queue: {action_queue} \n")
+#                     taken_action = action_queue.pop(0)
+#                     obs, reward, done, infos = env.step(taken_action)
 
-                    # Immediately end the game if coin is found.
-                    if "coin" in obs:
-                        taken_action = "take coin"
-                        obs, reward, done, infos = env.step(taken_action)
-                        end_game = True
-                        with open(file_name, "a") as f:
-                            f.write("Coin found!\n")
-                        coin_found = True
-                        break
+#                     # Immediately end the game if coin is found.
+#                     if "coin" in obs:
+#                         taken_action = "take coin"
+#                         obs, reward, done, infos = env.step(taken_action)
+#                         end_game = True
+#                         with open(file_name, "a") as f:
+#                             f.write("Coin found!\n")
+#                         coin_found = True
+#                         break
 
-                    action_text = "Action: " + taken_action + "\n"
-                    obs_text = summarize_obs(obs) + "\n"
-                    brief_obs = action_text + obs_text
-                    obs_queue.append(brief_obs)
-                    with open(file_name, "a") as f:
-                        f.write(f"> {taken_action} \n {brief_obs} \n")
+#                     action_text = "Action: " + taken_action + "\n"
+#                     obs_text = summarize_obs(obs) + "\n"
+#                     brief_obs = action_text + obs_text
+#                     obs_queue.append(brief_obs)
+#                     with open(file_name, "a") as f:
+#                         f.write(f"> {taken_action} \n {brief_obs} \n")
 
-                    # Check for common errors in the observation and update the error message.
-                    if "You can't move there, the door is closed." in brief_obs:
-                        large_loop_error_message = (
-                            f"This is the action you take: {taken_action}. "
-                            "The door that you are moving to is closed. "
-                            "You should first open the door to that direction then move there!"
-                        )
-                        break
-                    elif "That is already open." in brief_obs:
-                        large_loop_error_message = (
-                            f"This is the action you take: {taken_action}. "
-                            "You try to open a door that is already open. You already visited here. "
-                            "Make sure the status of door is correct."
-                        )
-                        break
-                    elif "I'm not sure what you mean." in brief_obs:
-                        if "open door" in taken_action:
-                            large_loop_error_message = (
-                                f"This is the action you take: {taken_action}. "
-                                "When you try to open door, there is no door here or nothing in that direction. "
-                                "If there is no door, you can directly move to that direction.\n"
-                            )
-                        elif "move" in taken_action:
-                            large_loop_error_message = (
-                                f"This is the action you take: {taken_action}. "
-                                "You cannot move to that direction. Review your action predicates and the problem files to check the status."
-                            )
-                        else:
-                            large_loop_error_message = (
-                                f"This is the action you take: {taken_action}. "
-                                "You got the environment error!"
-                            )
-                        break
+#                     # Check for common errors in the observation and update the error message.
+#                     if "You can't move there, the door is closed." in brief_obs:
+#                         large_loop_error_message = (
+#                             f"This is the action you take: {taken_action}. "
+#                             "The door that you are moving to is closed. "
+#                             "You should first open the door to that direction then move there!"
+#                         )
+#                         break
+#                     elif "That is already open." in brief_obs:
+#                         large_loop_error_message = (
+#                             f"This is the action you take: {taken_action}. "
+#                             "You try to open a door that is already open. You already visited here. "
+#                             "Make sure the status of door is correct."
+#                         )
+#                         break
+#                     elif "I'm not sure what you mean." in brief_obs:
+#                         if "open door" in taken_action:
+#                             large_loop_error_message = (
+#                                 f"This is the action you take: {taken_action}. "
+#                                 "When you try to open door, there is no door here or nothing in that direction. "
+#                                 "If there is no door, you can directly move to that direction.\n"
+#                             )
+#                         elif "move" in taken_action:
+#                             large_loop_error_message = (
+#                                 f"This is the action you take: {taken_action}. "
+#                                 "You cannot move to that direction. Review your action predicates and the problem files to check the status."
+#                             )
+#                         else:
+#                             large_loop_error_message = (
+#                                 f"This is the action you take: {taken_action}. "
+#                                 "You got the environment error!"
+#                             )
+#                         break
 
-                    tem_memory += brief_obs
-                    overall_memory_dic.append({"type": "action", "content": taken_action})
-                    overall_memory_dic.append({"type": "observation", "content": summarize_obs(obs)})
+#                     tem_memory += brief_obs
+#                     overall_memory_dic.append({"type": "action", "content": taken_action})
+#                     overall_memory_dic.append({"type": "observation", "content": summarize_obs(obs)})
 
-                    if not action_queue:
-                        action_passed = True
-                        successful_actions.extend(tem_action_queue)
-                        overall_memory += tem_memory
+#                     if not action_queue:
+#                         action_passed = True
+#                         successful_actions.extend(tem_action_queue)
+#                         overall_memory += tem_memory
 
-                # Record this large-loop iteration result for the step.
-                trial_step_record.append(within_step_tries)
-                if (within_step_tries == 5 and not action_passed) or end_game:
-                    end_game = True
-                    break
+#                 # Record this large-loop iteration result for the step.
+#                 trial_step_record.append(within_step_tries)
+#                 if (within_step_tries == 5 and not action_passed) or end_game:
+#                     end_game = True
+#                     break
 
-            trial_record.append(trial_step_record)
-            if end_game:
-                break
+#             trial_record.append(trial_step_record)
+#             if end_game:
+#                 break
 
-        with open("output/baseline_results.csv", "a", newline="") as csvfile:
-            # Write out: date, model_name, trial, coin_found, last step index, last large-loop iteration, and the full trial record.
-            data_row = [today, model_name, trial, coin_found, len(trial_record)-1, trial_record[-1] if trial_record else None, trial_record]
-            writer = csv.writer(csvfile)
-            writer.writerow(data_row)
+#         with open("output/baseline_results.csv", "a", newline="") as csvfile:
+#             # Write out: date, model_name, trial, coin_found, last step index, last large-loop iteration, and the full trial record.
+#             data_row = [today, model_name, trial, coin_found, len(trial_record)-1, trial_record[-1] if trial_record else None, trial_record]
+#             writer = csv.writer(csvfile)
+#             writer.writerow(data_row)
 
 
-def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=11, merging_method="llm"):
+# def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=11, merging_method="llm"):
     """
     For each trial:
       - For step 0, generate the initial domain (df) and problem file (pf) using llm_to_pddl.
@@ -1650,12 +1687,12 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 
 ## Run PDDL generation models
-run_iterative_model("o3-mini-2025-01-31", 0, 1) # gpt-4o; o3-mini
+i = 10
+run_iterative_model("o3-mini-2025-01-31", i, i+2) # gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
 
 
 ## Run pf merging models
-print(123)
 # run_merging_pf_model("gpt-4o-2024-05-13", 0, 2, merging_method="llm")
 # run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")
