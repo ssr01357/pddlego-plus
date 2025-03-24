@@ -60,7 +60,7 @@ def get_action_from_pddl(df, pf):
     result = run_solver(df, pf, "dual-bfws-ffparser")
     print(result)
     action = result['output']['plan']
-    err_2 = result['stderr']
+    err_2 = result['stderr'] + result['stdout']
     return map_actions(action), err_2
 
 
