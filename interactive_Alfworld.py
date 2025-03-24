@@ -400,15 +400,16 @@ def summarize_obs(obs):
     else:
         return obs.split('\n')[0].split(". ")[0] + ". " + obs.split('\n')[1]
 
-def map_actions(action):
+### === keep modifying this === ###
+def map_actions(action): # (GOTOLOCATION AGENT1 NEW_LOCATION TOWELHOLDER1)\n
     actions = action.lower().replace("(", "").replace(")", "").split('\n')
     action_lst = []
     for act in actions:
-        if "open" in act and "door" in act:
-            direction = act.split(' ')[-1]
-            action_lst.append(f'open door to {direction}')
-        elif "move" in act:
-            action_lst.append(f"move {act.split(' ')[-1]}")
+        if "gotolocation" in act:
+            location = act.split(' ')[-1]
+            # Insert a space between non-digits and digits, e.g., "towelholder1" -> "towelholder 1"
+            formatted_location = re.sub(r"(\D+)(\d+)", r"\1 \2", location)
+            action_lst.append(f"go to {formatted_location}")
     if len(action_lst) == 0:
         return None
     return action_lst
@@ -784,55 +785,59 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
 
         The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles.
         
+        Now, {goal}
+        Here are your current observations: {brief_obs}
+
         The following actions are allowed: 
         1. go to a location
             :action GotoLocation
-            :parameters (?a - agent ?lStart - location ?lEnd - location ?r - receptacle)
+            :parameters (?l - location ?r - receptacle)
         2. open an object/receptacle
             :action OpenObject
-            :parameters (?a - agent ?l - location ?r - receptacle)
+            :parameters (?l - location ?r - receptacle)
         3. close an object/receptacle
             :action CloseObject
-            :parameters (?a - agent ?l - location ?r - receptacle)
+            :parameters (?l - location ?r - receptacle)
         4. take an object from another object/receptacle
             :action PickupObject
-            :parameters (?a - agent ?l - location ?o - object ?r - receptacle)
+            :parameters (?l - location ?o - object ?r - receptacle)
         5. put object into/on/in another object/receptacle
             :action PutObject
-            :parameters (?a - agent ?l - location ?o - object ?r - receptacle ?ot - otype ?rt - rtype)
+            :parameters (?l - location ?o - object ?r - receptacle ?ot - otype ?rt - rtype)
         6. check inventory
         7. examine an object/receptacle
             :action examineReceptacle
-            :parameters (?a - agent ?r - receptacle)
+            :parameters (?r - receptacle)
         8. using an object/receptacle by turning it on/off with a switch
         9. heat an object with another object/receptacle
             :action HeatObject
-            :parameters (?a - agent ?l - location ?r - receptacle ?o - object)
+            :parameters (?l - location ?r - receptacle ?o - object)
         10. clean an object with another object/receptacle
             :action CleanObject
-            :parameters (?a - agent ?l - location ?r - receptacle ?o - object)
+            :parameters (?l - location ?r - receptacle ?o - object)
         11. cool an object with another object/receptacle
             :action CoolObject
-            :parameters (?a - agent ?l - location ?r - receptacle ?o - object)
+            :parameters (?l - location ?r - receptacle ?o - object)
         12. slice an object with another object/receptacle
             :action SliceObject
-            :parameters (?a - agent ?l - location ?co - object ?ko - object)
+            :parameters (?l - location ?co - object ?ko - object)
         13. look around.
 
         You must go to a location in order to use it or take/put objects on it.
 
-        Now, {goal}
-
         There should have two stages:
         1. You should first find this objects by keeping exploration and going to a location you have not visited yet. 
         In other words, initially, your objective is to explore new locations until you discover the object mentioned in the task.
+        In this first stage, you may only use action GotoLocation to explore new locations and OpenObject if it is closed to check if that object is what we want.
             (:goal 
                 (at ?location)
             ) where location should be somewhere not visited
+            (:goal 
+                (opened ?location)
+            ) if the visited location is closed and you need to open it to check the object
+        After you go the that location and found the object in it, you can update your goal to stage two.
 
         2. Once you have located the object, update your goal to use the object to complete the task.
-
-        Here are your current observations: {brief_obs}
     """ 
 
     prompt_prev_files = f"""
@@ -1645,7 +1650,7 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 
 ## Run PDDL generation models
-run_iterative_model("o3-mini-2025-01-31", 2, 3) # gpt-4o; o3-mini
+run_iterative_model("o3-mini-2025-01-31", 0, 1) # gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
 
