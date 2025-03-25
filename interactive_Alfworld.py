@@ -6,30 +6,31 @@ import csv
 import json
 import asyncio
 import re
-
+print(1)
 ## module for server
 # from kani import Kani
 # from kani.engines.huggingface import HuggingEngine
 
 import subprocess
 import requests
-
+print(2)
 import os
 import json
 import glob
 import random
 import argparse
 from os.path import join as pjoin
-
+print(3)
 from textworld_express import TextWorldExpressEnv
 import textworld
 import textworld.gym
-
+print(4)
 from alfworld.info import ALFWORLD_DATA
 from alfworld.agents.utils.misc import add_task_to_grammar
 from alfworld.agents.environment.alfred_tw_env import AlfredExpert, AlfredDemangler, AlfredExpertType
 
 from openai import OpenAI
+print('finishing import')
 
 client = OpenAI()
 # os.environ["OPENAI_API_KEY"] = ""
@@ -58,8 +59,8 @@ def run_solver(domain_file, problem_file, solver):
 def get_action_from_pddl(df, pf):
     # run_fast_downward(path_to_df, path_to_pf)
     result = run_solver(df, pf, "dual-bfws-ffparser")
-    print(result)
     action = result['output']['plan']
+    print(f"action from solver: {action}")
     err_2 = result['stderr'] + result['stdout']
     return map_actions(action), err_2
 
@@ -416,14 +417,12 @@ def map_actions(action):
             action_lst.append(f"open {formatted_object}")
         elif "pickupobject" in act:  # '(PICKUPOBJECT CLOTH1 CABINET4)' => ['take cloth 1 from cabinet 4']
             parts = act.split()
-            # Expecting parts: ['pickupobject', 'cloth1', 'cabinet4']
             if len(parts) >= 3:
                 obj = parts[1]
                 container = parts[2]
                 formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
                 formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
                 action_lst.append(f"take {formatted_obj} from {formatted_container}")
-        # elif : # '(PUTOBJECT CLOTH1 BATHTUBBASIN1)\n' => ['move cloth 1 to bathtubbasin 1']
         elif "putobject" in act:  # e.g., '(PUTOBJECT CLOTH1 BATHTUBBASIN1)' => ['move cloth 1 to bathtubbasin 1']
             parts = act.split()
             if len(parts) >= 3:
@@ -432,6 +431,7 @@ def map_actions(action):
                 formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
                 formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
                 action_lst.append(f"move {formatted_obj} to {formatted_container}")
+        # elif "examine" # => ['examine countertop 4']
     if len(action_lst) == 0:
         return None
     return action_lst
@@ -698,7 +698,7 @@ problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
-problem = os.path.dirname(problems[1]) # select a specific problem to test
+problem = os.path.dirname(problems[0]) # select a specific problem to test
 print(f"Playing {problem}")
 
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
@@ -1249,7 +1249,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     # print(err_validate)
 
                     obs, reward, done, infos = env.step(taken_action)
-
+                    
                     # Directly end the game if Done!
                     if infos["won"]:
                         # taken_action = "take coin"
@@ -1270,6 +1270,9 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     obs_queue.append(brief_obs)
                     with open(file_name, "a") as f:
                         f.write(f"> {taken_action} \n {brief_obs} \n")
+                        # with open(file_name, "a") as f:
+                        f.write(f"After taking action '{taken_action}', you have the following valid actions: {infos['admissible_commands']} \n")
+
 
                     if "Nothing happens." in brief_obs:
                         # if "xx" in taken_action:
@@ -1687,8 +1690,9 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 ## Run PDDL generation models
-i = 10
-run_iterative_model("o3-mini-2025-01-31", i, i+2) # gpt-4o; o3-mini
+i = 0
+num_trials = 5
+run_iterative_model("o3-mini-2025-01-31", i, i+num_trials) # gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
 
