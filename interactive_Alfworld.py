@@ -811,19 +811,19 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         Here are your current observations: {brief_obs}
 
         The following actions are allowed: 
-        1. go to a location
+        1. go to a receptacle
             :action GotoLocation
-            :parameters (?from - location ?to - location)
-        2. open an object/receptacle if it is closed
+            :parameters (?from - receptacle ?to - receptacle)
+        2. open a receptacle if it is closed
             :action OpenObject
             :parameters (?r - receptacle)
-        3. close an object/receptacle
+        3. close a receptacle
             :action CloseObject
             :parameters (?r - receptacle)
-        4. take an object from another object/receptacle
+        4. take an object from another receptacle
             :action PickupObject
             :parameters (?o - object ?r - receptacle)
-        5. put object into/on/in another object/receptacle
+        5. put object into/on/in another receptacle
             :action PutObject
             :parameters (?o - object ?r - receptacle)
 
