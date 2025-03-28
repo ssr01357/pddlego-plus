@@ -96,42 +96,42 @@ from openai import OpenAI
 # =================================================================================================
 # import re
 
-def map_actions(action):
-    actions = action.lower().replace("(", "").replace(")", "").split('\n')
-    action_lst = []
-    for act in actions:
-        if "gotolocation" in act: # '(GOTOLOCATION AGENT1 NEW_LOCATION TOWELHOLDER1)\n' => ['go to towelholder 1']
-            location = act.split(' ')[-1]
-            # Insert a space between non-digits and digits, e.g., "towelholder1" -> "towelholder 1"
-            formatted_location = re.sub(r"(\D+)(\d+)", r"\1 \2", location)
-            action_lst.append(f"go to {formatted_location}")
-        elif "openobject" in act: # '(OPENOBJECT CABINET4)\n' => ['open cabinet 4']
-            object_ = act.split(' ')[-1]
-            formatted_object = re.sub(r"(\D+)(\d+)", r"\1 \2", object_)
-            action_lst.append(f"open {formatted_object}")
-        elif "pickupobject" in act:  # '(PICKUPOBJECT CLOTH1 CABINET4)' => ['take cloth 1 from cabinet 4']
-            parts = act.split()
-            # Expecting parts: ['pickupobject', 'cloth1', 'cabinet4']
-            if len(parts) >= 3:
-                obj = parts[1]
-                container = parts[2]
-                formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
-                formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
-                action_lst.append(f"take {formatted_obj} from {formatted_container}")
-        # elif : # '(PUTOBJECT CLOTH1 BATHTUBBASIN1)\n'  
-        elif "putobject" in act:  # e.g., '(PUTOBJECT CLOTH1 BATHTUBBASIN1)' => ['put cloth 1 in/on bathtubbasin 1']
-            parts = act.split()
-            if len(parts) >= 3:
-                obj = parts[1]
-                container = parts[2]
-                formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
-                formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
-                action_lst.append(f"put {formatted_obj} in/on {formatted_container}")
-    if len(action_lst) == 0:
-        return None
-    return action_lst
+# def map_actions(action):
+#     actions = action.lower().replace("(", "").replace(")", "").split('\n')
+#     action_lst = []
+#     for act in actions:
+#         if "gotolocation" in act: # '(GOTOLOCATION AGENT1 NEW_LOCATION TOWELHOLDER1)\n' => ['go to towelholder 1']
+#             location = act.split(' ')[-1]
+#             # Insert a space between non-digits and digits, e.g., "towelholder1" -> "towelholder 1"
+#             formatted_location = re.sub(r"(\D+)(\d+)", r"\1 \2", location)
+#             action_lst.append(f"go to {formatted_location}")
+#         elif "openobject" in act: # '(OPENOBJECT CABINET4)\n' => ['open cabinet 4']
+#             object_ = act.split(' ')[-1]
+#             formatted_object = re.sub(r"(\D+)(\d+)", r"\1 \2", object_)
+#             action_lst.append(f"open {formatted_object}")
+#         elif "pickupobject" in act:  # '(PICKUPOBJECT CLOTH1 CABINET4)' => ['take cloth 1 from cabinet 4']
+#             parts = act.split()
+#             # Expecting parts: ['pickupobject', 'cloth1', 'cabinet4']
+#             if len(parts) >= 3:
+#                 obj = parts[1]
+#                 container = parts[2]
+#                 formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
+#                 formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
+#                 action_lst.append(f"take {formatted_obj} from {formatted_container}")
+#         # elif : # '(PUTOBJECT CLOTH1 BATHTUBBASIN1)\n'  
+#         elif "putobject" in act:  # e.g., '(PUTOBJECT CLOTH1 BATHTUBBASIN1)' => ['put cloth 1 in/on bathtubbasin 1']
+#             parts = act.split()
+#             if len(parts) >= 3:
+#                 obj = parts[1]
+#                 container = parts[2]
+#                 formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
+#                 formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
+#                 action_lst.append(f"put {formatted_obj} in/on {formatted_container}")
+#     if len(action_lst) == 0:
+#         return None
+#     return action_lst
 
-print(map_actions("(PUTOBJECT CLOTH1 BATHTUBBASIN1)\n"))
+# print(map_actions("(PUTOBJECT CLOTH1 BATHTUBBASIN1)\n"))
 
 # =================================================================================================
 ### ========= Alfworld =========
@@ -142,7 +142,7 @@ problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
-problem = os.path.dirname(problems[1]) # select a specific problem to test
+problem = os.path.dirname(problems[9]) # select a specific problem to test
 print(f"Playing {problem}")
 
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
@@ -158,6 +158,7 @@ pddl_file = os.path.join(problem, 'initial_state.pddl')
 json_file = os.path.join(problem, 'traj_data.json')
 with open(json_file, 'r') as f:
     traj_data = json.load(f)
+# print(traj_data) # check gold actions
 GAME_LOGIC['grammar'] = add_task_to_grammar(GAME_LOGIC['grammar'], traj_data)
 gamedata = dict(**GAME_LOGIC, pddl_problem=open(pddl_file).read())
 gamefile = os.path.join(os.path.dirname(pddl_file), 'game.tw-pddl')
@@ -192,11 +193,34 @@ valid_actions.remove('look')
 valid_actions.remove('inventory')
 valid_actions.remove('help')
 # print(infos)
-# brief_obs = "Action: look around\n" + summarize_obs(init_obs)+'\n'
+print(goal)
+print(init_obs)
+# print(infos)
+print(obs)
+# brief_obs = "Action: look around\n" + init_obs+'\n'
 
-actions = ['go to cabinet 4', 'open cabinet 4', 'take cloth 1 from cabinet 4', 'go to bathtubbasin 1', 'move cloth 1 to bathtubbasin 1']
+# cabinets = [f'cabinet {i}' for i in range(1,22)]
+
+# == Problem 1 ==
+# 'open shelf 1', 'examine shelf 1', 'open shelf 1', 'take cloth 1 from cabinet 4', 'go to bathtubbasin 1', 'examine bathtubbasin 1', 'move cloth 1 to bathtubbasin 1']
+
+# == Problem 3 ==
+# actions = ['go to countertop 1', 'take knife 1 from countertop 1', 'slice bread 1 with knife 1', 'move knife 1 to countertop 1', 'take bread 1 from countertop 1', \
+#            'go to microwave 1', 'open microwave 1', 'heat bread 1 with microwave 1', 'move bread 1 to microwave 1', 'take bread 1 from microwave 1', 'go to fridge 1','open fridge 1', 'move bread 1 to fridge 1']
+
+# == Problem 5: examine the alarmclock with the desklamp. ==
+# actions = ['go to desk 1', 'take alarmclock 2 from desk 1', 'use desklamp 1']
+
+# == Problem 6: clean some fork and put it in countertop. ==
+# actions = ['go to diningtable 1', 'take fork 1 from diningtable 1', 'go to sinkbasin 1', 'clean fork 1 with sinkbasin 1', 'take fork 1 from sinkbasin 1', 'go to countertop 1', 'move fork 1 to countertop 1']
+
+# == Problem 9: cool some winebottle and put it in diningtable. ==
+actions = ['go to diningtable 1', 'take winebottle 1 from diningtable 1', 'go to fridge 1', 'cool winebottle 1 with fridge 1', 'open fridge 1','take winebottle 1 from fridge 1', 'go to diningtable 1', 'move winebottle 1 to diningtable 1']
+
 for action in actions:
+    print('>', action)
     obs, reward, done, infos = env.step(action)
     print(obs)
-    # print(infos['admissible_commands'])
+    print(infos['admissible_commands'])
+
 print(infos['won'])

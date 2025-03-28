@@ -432,6 +432,8 @@ def map_actions(action):
                 formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
                 action_lst.append(f"move {formatted_obj} to {formatted_container}")
         # elif "examine" # => ['examine countertop 4']
+        # elif "" cool/heat/slice
+        # elif ==> 'use desklamp 1'
     if len(action_lst) == 0:
         return None
     return action_lst
@@ -889,20 +891,22 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             :action examineReceptacle
             :parameters (?r - receptacle)
         8. using an object/receptacle by turning it on/off with a switch
-        9. heat an object with another object/receptacle
+            :action useObject
+            :parameters (?o - object)
+        9. heat an object using a receptacle
             :action HeatObject
-            :parameters (?l - location ?r - receptacle ?o - object)
-        10. clean an object with another object/receptacle
+            :parameters (?o - object ?r - receptacle)
+        10. clean an object using a receptacle
             :action CleanObject
-            :parameters (?l - location ?r - receptacle ?o - object)
-        11. cool an object with another object/receptacle
+            :parameters (?o - object ?r - receptacle)
+        11. cool an object using a receptacle
             :action CoolObject
-            :parameters (?l - location ?r - receptacle ?o - object)
-        12. slice an object with another object/receptacle
+            :parameters (?o - object ?r - receptacle)
+        12. slice an object using a sharp object
             :action SliceObject
-            :parameters (?l - location ?co - object ?ko - object)
+            :parameters (?r - receptacle ?co - object ?sharp_o - object)
 
-        You must go to a receptacle in order to use it or take/put objects on it.
+        You must go to a receptacle first in order to use/open it or take/put objects on it.
 
         The process involves two main stages:
 
