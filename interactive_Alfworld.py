@@ -431,12 +431,12 @@ def map_actions(action):
                 formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
                 formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
                 action_lst.append(f"move {formatted_obj} to {formatted_container}")
-        elif "examinereceptacle" in act: # (EXAMINERECEPTACLE SHELF1) => ['examine shelf 1']
-            parts = act.split()
-            if len(parts) >= 2:
-                receptacle = parts[1]
-                formatted_receptacle = re.sub(r"(\D+)(\d+)", r"\1 \2", receptacle)
-                action_lst.append(f"examine {formatted_receptacle}")
+        # elif "examinereceptacle" in act: # (EXAMINERECEPTACLE SHELF1) => ['examine shelf 1']
+        #     parts = act.split()
+        #     if len(parts) >= 2:
+        #         receptacle = parts[1]
+        #         formatted_receptacle = re.sub(r"(\D+)(\d+)", r"\1 \2", receptacle)
+        #         action_lst.append(f"examine {formatted_receptacle}")
         elif "useobject" in act: # (USEOBJECT DESKLAMP1) => ['use desklamp 1']
             parts = act.split()
             if len(parts) >= 2:
@@ -930,22 +930,19 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         5. put object into/on/in another receptacle
             :action PutObject
             :parameters (?o - object ?r - receptacle)
-        6. examine an object/receptacle
-            :action examineReceptacle
-            :parameters (?r - receptacle)
-        7. using an object/receptacle by turning it on/off with a switch
+        6. using an object/receptacle by turning it on/off with a switch
             :action useObject
             :parameters (?o - object)
-        8. heat an object using a receptacle
+        7. heat an object using a receptacle
             :action HeatObject
             :parameters (?o - object ?r - receptacle)
-        9. clean an object using a receptacle
+        8. clean an object using a receptacle
             :action CleanObject
             :parameters (?o - object ?r - receptacle)
-        10. cool an object using a receptacle
+        9. cool an object using a receptacle
             :action CoolObject
             :parameters (?o - object ?r - receptacle)
-        11. slice an object using a sharp object
+        10. slice an object using a sharp object
             :action SliceObject
             :parameters (?r - receptacle ?co - object ?sharp_o - object)
 
