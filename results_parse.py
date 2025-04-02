@@ -4,7 +4,7 @@ import ast
 # Read CSV data.
 # Columns (in order):
 # date, model, game_id, coin_found, final_step_index, last_attempt_str, steps_str
-df = pd.read_csv("output/results.csv", header=None, 
+df = pd.read_csv("output/merging_results.csv", header=None, 
                  names=["date", "model", "game_id", "coin_found", "final_step_index", "last_attempt_str", "steps_str"])
 
 # Convert coin_found column to Boolean.
@@ -115,34 +115,27 @@ result = result.reset_index()
 print(result)
 
 
+# # Read the CSV with proper column names
+# df2 = pd.read_csv("output/baseline_results.csv", header=None, 
+#                   names=["date", "model", "game_id", "coin_found", "final_step_index", "last_attempt_str", "steps_str"])
 
-df2 = pd.read_csv("output/baseline_results.csv", header=None, 
-                 names=["date", "model", "game_id", "coin_found", "final_step_index", "last_attempt_str", "steps_str"])
+# # Convert coin_found to boolean if needed
+# df2["coin_found"] = df2["coin_found"].astype(bool)
 
-import ast
-import pandas as pd
+# # Convert steps_str from a string representation of a list of lists to an actual list
+# # and compute the number of steps (i.e. the length of the outer list)
+# df2["n_steps"] = df2["steps_str"].apply(lambda x: len(ast.literal_eval(x)) if pd.notnull(x) else 0)
 
-# Read the CSV with proper column names
-df2 = pd.read_csv("output/baseline_results.csv", header=None, 
-                  names=["date", "model", "game_id", "coin_found", "final_step_index", "last_attempt_str", "steps_str"])
+# # Group by model, and compute:
+# # - The total count of coin_found (True) per model.
+# # - The average number of steps for successful trials (coin_found True)
+# # - The average number of steps for failed trials (coin_found False)
+# df_success = df2[df2["coin_found"]].groupby("model")["n_steps"].mean().rename("avg_successful_steps")
+# df_fail = df2[~df2["coin_found"]].groupby("model")["n_steps"].mean().rename("avg_fail_steps")
+# coin_counts = df2.groupby("model")["coin_found"].sum().rename("coin_found_count")
+# total_trials = df2.groupby("model")["game_id"].count().rename("total_trials")
 
-# Convert coin_found to boolean if needed
-df2["coin_found"] = df2["coin_found"].astype(bool)
+# # Combine the results into one DataFrame
+# result2 = pd.concat([coin_counts, df_success, df_fail, total_trials], axis=1).reset_index()
 
-# Convert steps_str from a string representation of a list of lists to an actual list
-# and compute the number of steps (i.e. the length of the outer list)
-df2["n_steps"] = df2["steps_str"].apply(lambda x: len(ast.literal_eval(x)) if pd.notnull(x) else 0)
-
-# Group by model, and compute:
-# - The total count of coin_found (True) per model.
-# - The average number of steps for successful trials (coin_found True)
-# - The average number of steps for failed trials (coin_found False)
-df_success = df2[df2["coin_found"]].groupby("model")["n_steps"].mean().rename("avg_successful_steps")
-df_fail = df2[~df2["coin_found"]].groupby("model")["n_steps"].mean().rename("avg_fail_steps")
-coin_counts = df2.groupby("model")["coin_found"].sum().rename("coin_found_count")
-total_trials = df2.groupby("model")["game_id"].count().rename("total_trials")
-
-# Combine the results into one DataFrame
-result2 = pd.concat([coin_counts, df_success, df_fail, total_trials], axis=1).reset_index()
-
-print(result2)
+# print(result2)

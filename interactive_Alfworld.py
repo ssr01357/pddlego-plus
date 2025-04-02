@@ -930,27 +930,26 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         5. put object into/on/in another receptacle
             :action PutObject
             :parameters (?o - object ?r - receptacle)
-
-        7. examine an object/receptacle
+        6. examine an object/receptacle
             :action examineReceptacle
             :parameters (?r - receptacle)
-        8. using an object/receptacle by turning it on/off with a switch
+        7. using an object/receptacle by turning it on/off with a switch
             :action useObject
             :parameters (?o - object)
-        9. heat an object using a receptacle
+        8. heat an object using a receptacle
             :action HeatObject
             :parameters (?o - object ?r - receptacle)
-        10. clean an object using a receptacle
+        9. clean an object using a receptacle
             :action CleanObject
             :parameters (?o - object ?r - receptacle)
-        11. cool an object using a receptacle
+        10. cool an object using a receptacle
             :action CoolObject
             :parameters (?o - object ?r - receptacle)
-        12. slice an object using a sharp object
+        11. slice an object using a sharp object
             :action SliceObject
             :parameters (?r - receptacle ?co - object ?sharp_o - object)
 
-        You must go to a receptacle first in order to use/open it or take/put objects on it.
+        You must go to a receptacle first in order to use/open it or take/put objects from/on it.
 
         The process involves two main stages:
 
@@ -972,9 +971,11 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
                 ) where recepatacle should be the recepatacle you want to open.
 
         2. Using the Object to Complete the Task:
-            Once you have found the object, update your goal to focus on using it to complete the task.
-            You need to first use the PickupObject action to take the object from a receptacle, then go to the aiming location by using GotoLocation action, and then put it into another receptacle.
-            Or use it in some other way to complete the task.
+            Once you have located and picked up the object, update your goal to focus on how the object is used to complete the task. This may involve more than simply transferring it from one place to another.
+            For example: You might examine the object or a nearby receptacle to gather information. You may need to use another tool or device (like a lamp or a switch). Some tasks require you to slice, heat, cool, or clean the object using an appropriate receptacle (e.g., microwave, sink, fridge).
+
+            If necessary, use the PickupObject action to retrieve the item, and the GotoLocation action to move to the correct place.
+            Then, apply the object in a purposeful way — not just move it — but interact with the environment to fulfill the task’s actual goal.
 
         In summary, the first stage is all about finding the object—this might involve traveling to a location and opening it if necessary.
         
