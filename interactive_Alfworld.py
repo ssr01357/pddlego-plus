@@ -431,10 +431,53 @@ def map_actions(action):
                 formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
                 formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
                 action_lst.append(f"move {formatted_obj} to {formatted_container}")
-        # elif "examine" # => ['examine countertop 4']
-        # elif "" cool/heat/slice
-        # elif ==> 'use desklamp 1'
-        
+        elif "examinereceptacle" in act: # (EXAMINERECEPTACLE SHELF1) => ['examine shelf 1']
+            parts = act.split()
+            if len(parts) >= 2:
+                receptacle = parts[1]
+                formatted_receptacle = re.sub(r"(\D+)(\d+)", r"\1 \2", receptacle)
+                action_lst.append(f"examine {formatted_receptacle}")
+        elif "useobject" in act: # (USEOBJECT DESKLAMP1) => ['use desklamp 1']
+            parts = act.split()
+            if len(parts) >= 2:
+                obj = parts[1]
+                formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
+                action_lst.append(f"use {formatted_obj}")
+        elif "heatobject" in act: # (HEATOBJECT BREAD1 MICROWAVE1) => ['heat bread 1 with microwave 1']
+            parts = act.split()
+            if len(parts) >= 3:
+                obj = parts[1]
+                receptacle = parts[2]
+                formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
+                formatted_receptacle = re.sub(r"(\D+)(\d+)", r"\1 \2", receptacle)
+                action_lst.append(f"heat {formatted_obj} with {formatted_receptacle}")
+        elif "cleanobject" in act: # (CLEANOBJECT FORK1 SINKBASIN1) => ['clean fork 1 with sinkbasin 1']
+            parts = act.split()
+            if len(parts) >= 3:
+                obj = parts[1]
+                receptacle = parts[2]
+                formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
+                formatted_receptacle = re.sub(r"(\D+)(\d+)", r"\1 \2", receptacle)
+                action_lst.append(f"clean {formatted_obj} with {formatted_receptacle}")
+        elif "coolobject" in act: # (COOLOBJECT WINEBOTTLE1 FRIDGE1) => ['cool winebottle 1 with fridge 1']
+            parts = act.split()
+            if len(parts) >= 3:
+                obj = parts[1]
+                receptacle = parts[2]
+                formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
+                formatted_receptacle = re.sub(r"(\D+)(\d+)", r"\1 \2", receptacle)
+                action_lst.append(f"cool {formatted_obj} with {formatted_receptacle}")
+        elif "sliceobject" in act: # (SLICEOBJECT COUNTERTOP1 BREAD1 KNIFE1) => ['slice bread 1 with knife 1']
+            parts = act.split()
+            if len(parts) >= 4:
+                # Ignore the location (parts[1], "COUNTERTOP1") and take parts[2] (the object) and parts[3] (the sharp tool).
+                obj = parts[2]
+                sharp_obj = parts[3]
+                sharp_obj = sharp_obj.replace(")", "")
+                formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
+                formatted_sharp = re.sub(r"(\D+)(\d+)", r"\1 \2", sharp_obj)
+                action_lst.append(f"slice {formatted_obj} with {formatted_sharp}")
+
     if len(action_lst) == 0:
         return None
     return action_lst
