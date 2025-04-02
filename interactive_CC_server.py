@@ -1760,5 +1760,5 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 ## Run pf merging models
 
 # run_merging_pf_model("o3-mini-2025-01-31", 12, 13, merging_method="llm")
-run_merging_pf_model("gpt-4o-2024-05-13", 6, 10, merging_method="llm")
+run_merging_pf_model("gpt-4o-2024-05-13", 9, 11, merging_method="llm")
 # run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")

@@ -1812,8 +1812,8 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 ## Run PDDL generation models
 i = 1
 num_trials = 10
-run_iterative_model("o3-mini-2025-01-31", i, i+num_trials) 
-run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials)# gpt-4o; o3-mini
+# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials) 
+run_iterative_model("gpt-4o-2024-05-13", 9, 11)# gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
 

@@ -4,7 +4,7 @@ import ast
 # Read CSV data.
 # Columns (in order):
 # date, model, game_id, coin_found, final_step_index, last_attempt_str, steps_str
-df = pd.read_csv("output/merging_results.csv", header=None, 
+df = pd.read_csv("output/tem_alfworld_20_results.csv", header=None, 
                  names=["date", "model", "game_id", "coin_found", "final_step_index", "last_attempt_str", "steps_str"])
 
 # Convert coin_found column to Boolean.
