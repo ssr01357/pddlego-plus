@@ -434,6 +434,7 @@ def map_actions(action):
         # elif "examine" # => ['examine countertop 4']
         # elif "" cool/heat/slice
         # elif ==> 'use desklamp 1'
+        
     if len(action_lst) == 0:
         return None
     return action_lst
@@ -1762,5 +1763,7 @@ run_iterative_model("o3-mini-2025-01-31", i, i+num_trials) # gpt-4o; o3-mini
 
 
 ## Run pf merging models
+
+# run_merging_pf_model("gpt-4o-2024-05-13", 9, 12, merging_method="llm")
 # run_merging_pf_model("gpt-4o-2024-05-13", 0, 2, merging_method="llm")
 # run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")

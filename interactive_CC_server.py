@@ -898,7 +898,7 @@ def merge_problem_files_code(old_pf: str, new_pf: str) -> str:
         )
 
         (:init
-            {"\n    ".join(sorted(list(final_init_set)))}
+            {"    ".join(sorted(list(final_init_set)))}
         )
 
         (:goal
@@ -919,7 +919,9 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
     for trial in range(start_trial, end_trial):
         coin_found = False
         today = date.today()
-        file_name = f"output/05_020625_100trials/{today}_{model_name.replace("/","_")}_{trial}.txt"
+
+        fixed_model_name = model_name.replace("/","_")
+        file_name = f"output/07_022825_merging/{today}_{fixed_model_name}_{trial}.txt"
         trial_record = []
         
         env = TextWorldExpressEnv(envStepLimit=100)
@@ -1128,7 +1130,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             if end_game:
                 break
         
-        with open("output/results.csv", "a", newline="") as csvfile:
+        with open("output/merging_results.csv", "a", newline="") as csvfile:
             # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
             data_row = [today, model_name, trial, coin_found, len(trial_record)-1,trial_record[-1][-1], trial_record]
             writer = csv.writer(csvfile)
@@ -1756,5 +1758,7 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 
 ## Run pf merging models
-# run_merging_pf_model("gpt-4o-2024-05-13", 3, 6, merging_method="llm")
+
+# run_merging_pf_model("o3-mini-2025-01-31", 12, 13, merging_method="llm")
+run_merging_pf_model("gpt-4o-2024-05-13", 6, 10, merging_method="llm")
 # run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")
