@@ -215,7 +215,7 @@ print(obs)
 # actions = ['go to diningtable 1', 'take fork 1 from diningtable 1', 'go to sinkbasin 1', 'clean fork 1 with sinkbasin 1', 'take fork 1 from sinkbasin 1', 'go to countertop 1', 'move fork 1 to countertop 1']
 
 # == Problem 9: cool some winebottle and put it in diningtable. ==
-actions = ['go to diningtable 1', 'take winebottle 1 from diningtable 1', 'go to fridge 1', 'cool winebottle 1 with fridge 1', 'open fridge 1','take winebottle 1 from fridge 1', 'go to diningtable 1', 'move winebottle 1 to diningtable 1']
+# actions = ['go to diningtable 1', 'take winebottle 1 from diningtable 1', 'go to fridge 1', 'cool winebottle 1 with fridge 1', 'open fridge 1','take winebottle 1 from fridge 1', 'go to diningtable 1', 'move winebottle 1 to diningtable 1']
 
 for action in actions:
     print('>', action)

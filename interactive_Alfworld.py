@@ -744,7 +744,7 @@ problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
-problem = os.path.dirname(problems[0]) # select a specific problem to test
+problem = os.path.dirname(problems[1]) # select a specific problem to test
 print(f"Playing {problem}")
 
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
@@ -962,7 +962,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
                 You goal should look like this:
                 (:goal 
                     (at ?recepatacle)
-                ) where recepatacle should be somewhere or some recepatacle not visited.
+                ) where recepatacle should be somewhere or some recepatacles not visited.
 
             Goal 1.2: If you already go to the recepatacle and found the recepatacle is closed, use the OpenObject action to open it and inspect the contents. 
                 Your goal should look like this:
@@ -977,7 +977,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             If necessary, use the PickupObject action to retrieve the item, and the GotoLocation action to move to the correct place.
             Then, apply the object in a purposeful way — not just move it — but interact with the environment to fulfill the task’s actual goal.
 
-        In summary, the first stage is all about finding the object—this might involve traveling to a location and opening it if necessary.
+        In summary, the first stage is all about finding the object—this might involve going to an unvisited receptacle and opening it if necessary.
         
         Note, some receptacles have numbers in their names. Always keep them as they are. For example, "towelholder1" should not be changed to "towelholder".
         Your initial goal should always be to go to a new location instead of put something into somewhere.
@@ -1386,8 +1386,22 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     if "Nothing happens." in brief_obs:
                         # if "xx" in taken_action:
                         #     large_loop_error_message = ""
-                        large_loop_error_message = f"This is the action you take: {taken_action}. \
-                            But nothing happens. You should try another action!"
+                        # large_loop_error_message = f"This is the action you take: {taken_action}. \
+                        #     But nothing happens. You should try another action!"
+                        if "open" in taken_action:
+                            large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to open a receptacle but nothing happens. 
+                            You should first go to this receptacle to open it. 
+                            But if you have already go to this receptacle and still seeing this error message, it means that this receptacle cannot be opened and you can directly see objects after you go to it."""
+                        elif "take" in taken_action:
+                            large_loop_error_message = f"This is the action you take: {taken_action}. You are trying to take something not existed from that receptacle. You should go to other receptacle to find your aim object."
+                        elif "move" in taken_action:
+                            large_loop_error_message = f"""This is the action you take: {taken_action}.
+                            You want to move some object to a receptacle but failed. You should first find that object somewhere by going to an unvisited receptacle and open if necessary.
+                            Then pick up the aiming object so that you can go to your aim receptacle and put it there.
+                            """
+                        elif "slice" in taken_action:
+                            large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to slice an object with a sharp object.
+                            You should first pickup the sharp object then take the slice action"""
                         break
 
                     # append into overall memory and dictionary format
@@ -1585,211 +1599,211 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 # def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=11, merging_method="llm"):
-    """
-    For each trial:
-      - For step 0, generate the initial domain (df) and problem file (pf) using llm_to_pddl.
-      - For subsequent steps, first generate a temporary PF (using generate_problem_file_from_observation, which now returns only a PF)
-        based solely on the new observation, then merge it with the previously fixed PF (stored in pending_pf).
-      - Then, use the large loop (with a nested small loop) to fix the merged PF.
+#     """
+#     For each trial:
+#       - For step 0, generate the initial domain (df) and problem file (pf) using llm_to_pddl.
+#       - For subsequent steps, first generate a temporary PF (using generate_problem_file_from_observation, which now returns only a PF)
+#         based solely on the new observation, then merge it with the previously fixed PF (stored in pending_pf).
+#       - Then, use the large loop (with a nested small loop) to fix the merged PF.
     
-    The fixed PF is stored in pending_pf for future steps.
-    """
-    for trial in range(start_trial, end_trial):
-        coin_found = False
-        today = date.today()
-        file_name = f"output/07_022825_merging/merging_{today}_{model_name.replace('/','_')}_{trial}.txt"
-        trial_record = []
+#     The fixed PF is stored in pending_pf for future steps.
+#     """
+#     for trial in range(start_trial, end_trial):
+#         coin_found = False
+#         today = date.today()
+#         file_name = f"output/07_022825_merging/merging_{today}_{model_name.replace('/','_')}_{trial}.txt"
+#         trial_record = []
         
-        # Initialize environment
-        env = TextWorldExpressEnv(envStepLimit=100)
-        NUM_LOCATIONS = 11
-        env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-        obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+#         # Initialize environment
+#         env = TextWorldExpressEnv(envStepLimit=100)
+#         NUM_LOCATIONS = 11
+#         env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+#         obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
         
-        with open(file_name, "a") as f:
-            f.write(f"Observations: {obs}\n")
-            f.write(f"Gold path: {env.getGoldActionSequence()}\n")
-            f.write(f"Valid Actions: {infos['validActions']}\n")
-            f.write(f"taskDescription: {infos['taskDescription']}\n")
+#         with open(file_name, "a") as f:
+#             f.write(f"Observations: {obs}\n")
+#             f.write(f"Gold path: {env.getGoldActionSequence()}\n")
+#             f.write(f"Valid Actions: {infos['validActions']}\n")
+#             f.write(f"taskDescription: {infos['taskDescription']}\n")
         
-        valid_actions = sorted(infos['validActions'])
-        if 'look around' in valid_actions:
-            valid_actions.remove('look around')
-        if 'inventory' in valid_actions:
-            valid_actions.remove('inventory')
+#         valid_actions = sorted(infos['validActions'])
+#         if 'look around' in valid_actions:
+#             valid_actions.remove('look around')
+#         if 'inventory' in valid_actions:
+#             valid_actions.remove('inventory')
         
-        MAX_STEPS = 20
-        brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
-        with open(file_name, "a") as f:
-            f.write(f"brief_obs: {brief_obs}\n")
+#         MAX_STEPS = 20
+#         brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
+#         with open(file_name, "a") as f:
+#             f.write(f"brief_obs: {brief_obs}\n")
         
-        # Reinitialize trial-level tracking variables.
-        action_queue = []
-        obs_queue = []
-        df = ""                # Domain file remains managed by llm_to_pddl.
-        pending_pf = ""        # This will hold the fixed PF waiting to be fixed further.
-        all_actions = []
-        successful_actions = []
-        overall_memory = brief_obs
-        end_game = False
+#         # Reinitialize trial-level tracking variables.
+#         action_queue = []
+#         obs_queue = []
+#         df = ""                # Domain file remains managed by llm_to_pddl.
+#         pending_pf = ""        # This will hold the fixed PF waiting to be fixed further.
+#         all_actions = []
+#         successful_actions = []
+#         overall_memory = brief_obs
+#         end_game = False
         
-        for step_id in range(MAX_STEPS):
-            with open(file_name, "a") as f:
-                f.write(f"\n\n====Step {step_id}====\n")
-            trial_step_record = []
-            within_step_tries = 0
-            action_passed = False
-            large_loop_error_message = ""
+#         for step_id in range(MAX_STEPS):
+#             with open(file_name, "a") as f:
+#                 f.write(f"\n\n====Step {step_id}====\n")
+#             trial_step_record = []
+#             within_step_tries = 0
+#             action_passed = False
+#             large_loop_error_message = ""
             
-            # --- Before entering the loops, prepare a temporary PF ---
-            if step_id == 0:
-                # First step: generate directly using llm_to_pddl.
-                df, pending_pf, err, prompt = llm_to_pddl(model_name, brief_obs)
-                # pending_pf = pf  # set initial fixed PF.
-                with open(file_name, "a") as f:
-                    f.write("Initial PF generated using llm_to_pddl:\n")
-                    f.write(f"Prompt:\n{prompt}")
-                    f.write(f"DF:\n{df}\nPF:\n{pending_pf}\n")
-            else:
-                # For subsequent steps, generate a temporary PF from the new observation.
-                # Note: generate_problem_file_from_observation now returns only a PF.
-                pf_temp = generate_problem_file_from_observation(
-                    observation=brief_obs,
-                    model_name=model_name,
-                    domain_file=df  # may be empty or minimal.
-                )
-                with open(file_name, "a") as f:
-                    f.write("New temporary PF generated from observation:\n")
-                    f.write(f"PF (temp):\n{pf_temp}\n")
-                # Merge the new temporary PF with the previously fixed PF.
-                # if pf and pf_temp:
-                if merging_method == "llm":
-                    pending_pf = merge_problem_files_llm(old_problem_file=pf, new_problem_file=pf_temp, model_name=model_name)
-                else:
-                    pending_pf = merge_problem_files_code(pf, pf_temp)
-                # else:
-                #     merged_pf = pf_temp
-                with open(file_name, "a") as f:
-                    f.write("Merged PF after combining temporary PF with previous PF:\n")
-                    f.write(f"{pending_pf}\n")
-                # pending_pf = merged_pf  # Update pending_pf for this step.
+#             # --- Before entering the loops, prepare a temporary PF ---
+#             if step_id == 0:
+#                 # First step: generate directly using llm_to_pddl.
+#                 df, pending_pf, err, prompt = llm_to_pddl(model_name, brief_obs)
+#                 # pending_pf = pf  # set initial fixed PF.
+#                 with open(file_name, "a") as f:
+#                     f.write("Initial PF generated using llm_to_pddl:\n")
+#                     f.write(f"Prompt:\n{prompt}")
+#                     f.write(f"DF:\n{df}\nPF:\n{pending_pf}\n")
+#             else:
+#                 # For subsequent steps, generate a temporary PF from the new observation.
+#                 # Note: generate_problem_file_from_observation now returns only a PF.
+#                 pf_temp = generate_problem_file_from_observation(
+#                     observation=brief_obs,
+#                     model_name=model_name,
+#                     domain_file=df  # may be empty or minimal.
+#                 )
+#                 with open(file_name, "a") as f:
+#                     f.write("New temporary PF generated from observation:\n")
+#                     f.write(f"PF (temp):\n{pf_temp}\n")
+#                 # Merge the new temporary PF with the previously fixed PF.
+#                 # if pf and pf_temp:
+#                 if merging_method == "llm":
+#                     pending_pf = merge_problem_files_llm(old_problem_file=pf, new_problem_file=pf_temp, model_name=model_name)
+#                 else:
+#                     pending_pf = merge_problem_files_code(pf, pf_temp)
+#                 # else:
+#                 #     merged_pf = pf_temp
+#                 with open(file_name, "a") as f:
+#                     f.write("Merged PF after combining temporary PF with previous PF:\n")
+#                     f.write(f"{pending_pf}\n")
+#                 # pending_pf = merged_pf  # Update pending_pf for this step.
             
-            # --- Now, enter the large loop (with small loop nested inside) to fix the current pending_pf ---
-            while within_step_tries < 5 and not action_passed:
-                with open(file_name, "a") as f:
-                    f.write(f"\n----Larger Loop No. {within_step_tries}----\n")
-                    f.write(f"Successful actions so far: {successful_actions}\n")
-                within_step_tries += 1
+#             # --- Now, enter the large loop (with small loop nested inside) to fix the current pending_pf ---
+#             while within_step_tries < 5 and not action_passed:
+#                 with open(file_name, "a") as f:
+#                     f.write(f"\n----Larger Loop No. {within_step_tries}----\n")
+#                     f.write(f"Successful actions so far: {successful_actions}\n")
+#                 within_step_tries += 1
                 
-                if within_step_tries > 1:
-                    # Reset environment and replay successful actions.
-                    env = TextWorldExpressEnv(envStepLimit=100)
-                    env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-                    obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-                    for act in successful_actions:
-                        obs, reward, done, infos = env.step(act)
+#                 if within_step_tries > 1:
+#                     # Reset environment and replay successful actions.
+#                     env = TextWorldExpressEnv(envStepLimit=100)
+#                     env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+#                     obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+#                     for act in successful_actions:
+#                         obs, reward, done, infos = env.step(act)
                 
-                action_queue = []
-                tem_action_queue = []
-                tem_memory = ""
-                start_checkpoint = True
+#                 action_queue = []
+#                 tem_action_queue = []
+#                 tem_memory = ""
+#                 start_checkpoint = True
                 
-                while start_checkpoint or action_queue:
-                    with open(file_name, "a") as f:
-                        f.write(f"Small Loop, action_queue: {action_queue}\n")
-                    start_checkpoint = False
+#                 while start_checkpoint or action_queue:
+#                     with open(file_name, "a") as f:
+#                         f.write(f"Small Loop, action_queue: {action_queue}\n")
+#                     start_checkpoint = False
                     
-                    if not action_queue:
-                        if obs_queue:
-                            brief_obs = "\n".join(obs_queue)
-                            obs_queue = []
+#                     if not action_queue:
+#                         if obs_queue:
+#                             brief_obs = "\n".join(obs_queue)
+#                             obs_queue = []
                         
-                        num_tries = 0
-                        # Fix the current pending PF using llm_to_pddl.
-                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, prev_df=df, prev_pf=pending_pf, overall_memory=overall_memory, large_loop_error_message=large_loop_error_message)
-                        action, err_2 = get_action_from_pddl(df, pf)
-                        with open(file_name, "a") as f:
-                            f.write(f"--Small Loop--: {num_tries}\n")
-                            f.write(f"Error: {err} & {err_2}\n")
-                            f.write(f"Prompt: {prompt}\n")
-                            f.write(f"Generated DF and PF:\n{df}\n{pf}\n")
-                            f.write(f"Actions from solver(df, pf): {action}\n")
-                        while not action and num_tries < 5:
-                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, prev_df=df, prev_pf=pending_pf, prev_err=err, prev_err_2=err_2, have_error=True, overall_memory=overall_memory, large_loop_error_message=large_loop_error_message)
-                            action, err_2 = get_action_from_pddl(df, pf)
-                            num_tries += 1
-                            with open(file_name, "a") as f:
-                                f.write(f"--Small Loop--: {num_tries}\n")
-                                f.write(f"Error: {err} & {err_2}\n")
-                                f.write(f"Prompt: {prompt}\n")
-                                f.write(f"Generated DF and PF:\n{df}\n{pf}\n")
-                                f.write(f"Actions from solver(df, pf): {action}\n")
-                        trial_step_record.append([within_step_tries, num_tries])
-                        if not action:
-                            end_game = True
-                            break
-                        else:
-                            action_queue.extend(action)
-                            tem_action_queue.extend(action)
+#                         num_tries = 0
+#                         # Fix the current pending PF using llm_to_pddl.
+#                         df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, prev_df=df, prev_pf=pending_pf, overall_memory=overall_memory, large_loop_error_message=large_loop_error_message)
+#                         action, err_2 = get_action_from_pddl(df, pf)
+#                         with open(file_name, "a") as f:
+#                             f.write(f"--Small Loop--: {num_tries}\n")
+#                             f.write(f"Error: {err} & {err_2}\n")
+#                             f.write(f"Prompt: {prompt}\n")
+#                             f.write(f"Generated DF and PF:\n{df}\n{pf}\n")
+#                             f.write(f"Actions from solver(df, pf): {action}\n")
+#                         while not action and num_tries < 5:
+#                             df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, prev_df=df, prev_pf=pending_pf, prev_err=err, prev_err_2=err_2, have_error=True, overall_memory=overall_memory, large_loop_error_message=large_loop_error_message)
+#                             action, err_2 = get_action_from_pddl(df, pf)
+#                             num_tries += 1
+#                             with open(file_name, "a") as f:
+#                                 f.write(f"--Small Loop--: {num_tries}\n")
+#                                 f.write(f"Error: {err} & {err_2}\n")
+#                                 f.write(f"Prompt: {prompt}\n")
+#                                 f.write(f"Generated DF and PF:\n{df}\n{pf}\n")
+#                                 f.write(f"Actions from solver(df, pf): {action}\n")
+#                         trial_step_record.append([within_step_tries, num_tries])
+#                         if not action:
+#                             end_game = True
+#                             break
+#                         else:
+#                             action_queue.extend(action)
+#                             tem_action_queue.extend(action)
                     
-                    if not action_queue:
-                        break
+#                     if not action_queue:
+#                         break
                     
-                    taken_action = action_queue.pop(0)
-                    obs, reward, done, infos = env.step(taken_action)
-                    if "coin" in obs:
-                        obs, reward, done, infos = env.step("take coin")
-                        coin_found = True
-                        end_game = True
-                        with open(file_name, "a") as f:
-                            f.write("Coin found!\n")
-                        break
+#                     taken_action = action_queue.pop(0)
+#                     obs, reward, done, infos = env.step(taken_action)
+#                     if "coin" in obs:
+#                         obs, reward, done, infos = env.step("take coin")
+#                         coin_found = True
+#                         end_game = True
+#                         with open(file_name, "a") as f:
+#                             f.write("Coin found!\n")
+#                         break
                     
-                    action_text = "Action: " + taken_action + "\n"
-                    obs_text = summarize_obs(obs) + "\n"
-                    brief_obs = action_text + obs_text
-                    obs_queue.append(brief_obs)
-                    with open(file_name, "a") as f:
-                        f.write(f"> {taken_action}\n{brief_obs}\n")
+#                     action_text = "Action: " + taken_action + "\n"
+#                     obs_text = summarize_obs(obs) + "\n"
+#                     brief_obs = action_text + obs_text
+#                     obs_queue.append(brief_obs)
+#                     with open(file_name, "a") as f:
+#                         f.write(f"> {taken_action}\n{brief_obs}\n")
                     
-                    if "You can't move there, the door is closed." in brief_obs:
-                        large_loop_error_message = f"Action '{taken_action}' leads to a closed door."
-                        break
-                    elif "That is already open." in brief_obs:
-                        large_loop_error_message = f"Action '{taken_action}' tries to open an already open door."
-                        break
-                    elif "I'm not sure what you mean." in brief_obs:
-                        large_loop_error_message = f"Invalid action: {taken_action}."
-                        action_passed = False
-                        break
+#                     if "You can't move there, the door is closed." in brief_obs:
+#                         large_loop_error_message = f"Action '{taken_action}' leads to a closed door."
+#                         break
+#                     elif "That is already open." in brief_obs:
+#                         large_loop_error_message = f"Action '{taken_action}' tries to open an already open door."
+#                         break
+#                     elif "I'm not sure what you mean." in brief_obs:
+#                         large_loop_error_message = f"Invalid action: {taken_action}."
+#                         action_passed = False
+#                         break
                     
-                    tem_memory += brief_obs
+#                     tem_memory += brief_obs
                     
-                    if not action_queue:
-                        action_passed = True
-                        overall_memory += tem_memory
-                        successful_actions.extend(tem_action_queue)
+#                     if not action_queue:
+#                         action_passed = True
+#                         overall_memory += tem_memory
+#                         successful_actions.extend(tem_action_queue)
                 
-                if (within_step_tries == 5 and not action_passed) or end_game:
-                    end_game = True
-                    break
+#                 if (within_step_tries == 5 and not action_passed) or end_game:
+#                     end_game = True
+#                     break
             
-            trial_record.append(trial_step_record)
-            if end_game:
-                break
+#             trial_record.append(trial_step_record)
+#             if end_game:
+#                 break
         
-        with open("output/merging_results.csv", "a", newline="") as csvfile:
-            data_row = [
-                today,
-                model_name,
-                trial,
-                coin_found,
-                len(trial_record)-1 if trial_record else 0,
-                trial_record[-1] if trial_record else "No steps",
-                trial_record
-            ]
-            writer = csv.writer(csvfile)
-            writer.writerow(data_row)
+#         with open("output/merging_results.csv", "a", newline="") as csvfile:
+#             data_row = [
+#                 today,
+#                 model_name,
+#                 trial,
+#                 coin_found,
+#                 len(trial_record)-1 if trial_record else 0,
+#                 trial_record[-1] if trial_record else "No steps",
+#                 trial_record
+#             ]
+#             writer = csv.writer(csvfile)
+#             writer.writerow(data_row)
 
 ## Run baseline models
 # run_baseline_model("gpt-4o-mini-2024-07-18", 0, 2)
@@ -1800,8 +1814,9 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 ## Run PDDL generation models
 i = 1
-num_trials = 5
-run_iterative_model("o3-mini-2025-01-31", i, i+num_trials) # gpt-4o; o3-mini
+num_trials = 10
+run_iterative_model("o3-mini-2025-01-31", i, i+num_trials) 
+run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials)# gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
 
