@@ -1249,14 +1249,17 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
 
 
 # Main functions here:
-def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial = 0, end_trial = 11):
+def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial = 0, end_trial = 11, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
     # trial_record = 
     # structured_info_record = "output/summary"
     for trial in range(start_trial, end_trial):
         succeed = False
         today = date.today()
         fixed_model_name = model_name.replace("/","_")
-        file_name = f"output/08_031825_alfworld/{today}_{fixed_model_name}_{trial}.txt"
+        folder_path = f"output/{folder_name}"
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+        file_name = f"{folder_path}/{today}_{fixed_model_name}_{trial}.txt"
         trial_record = []
         
         # each trial reset environment
@@ -1375,7 +1378,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         
                         if not df and not pf: # First step no need duplicates detection
                             num_tries = 0
-                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs) # error 1 here
+                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, goal_type=goal_type) # error 1 here
                             action, err_2 = get_action_from_pddl(df, pf) # error 2 here
                             with open(file_name, "a") as f:
                                 f.write(f"--Small Loop--: {num_tries} \n")
@@ -1385,7 +1388,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                 f.write(f"Actions from solver(df, pf): {action} \n")
 
                             while not action and num_tries < 5:
-                                df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, False, edit)
+                                df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, False, edit, goal_type=goal_type)
                                 action, err_2 = get_action_from_pddl(df, pf)
                                 num_tries += 1
                                 
@@ -1399,7 +1402,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                             num_tries = 0
                             # Every time read new error message from larger loop
                             # In llm_to_pddl, detect if new large loop error message exists
-                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message) # need to add new error message
+                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type) # need to add new error message
                             action, err_2 = get_action_from_pddl(df, pf)
 
                             with open(file_name, "a") as f:
@@ -1410,7 +1413,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                 f.write(f"Actions from solver(df, pf): {action} \n")
 
                             while not action and num_tries < 5:
-                                df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message)
+                                df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type)
                                 action, err_2 = get_action_from_pddl(df, pf)
                                 num_tries += 1
 
@@ -1445,14 +1448,10 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     
                     # Directly end the game if Done!
                     if infos["won"]:
-                        # taken_action = "take coin"
-                        # obs, reward, done, infos = env.step(taken_action)
                         end_game = True
                         succeed = True
                         with open(file_name, "a") as f:
                             f.write('Done!')
-                            
-                            # coin_found = True
                         break
                     
                     action_text = "Action: " + taken_action + "\n"
@@ -1463,15 +1462,10 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     obs_queue.append(brief_obs)
                     with open(file_name, "a") as f:
                         f.write(f"> {taken_action} \n {brief_obs} \n")
-                        # with open(file_name, "a") as f:
                         f.write(f"After taking action '{taken_action}', you have the following valid actions: {infos['admissible_commands']} \n")
 
 
                     if "Nothing happens." in brief_obs:
-                        # if "xx" in taken_action:
-                        #     large_loop_error_message = ""
-                        # large_loop_error_message = f"This is the action you take: {taken_action}. \
-                        #     But nothing happens. You should try another action!"
                         if "open" in taken_action:
                             large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to open a receptacle but nothing happens. 
                             You should first go to this receptacle to open it. 
@@ -1507,7 +1501,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             if end_game:
                 break
         
-        with open("output/alfworld_results.csv", "a", newline="") as csvfile:
+        with open(f"output/{result_name}.csv", "a", newline="") as csvfile: 
             # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
             data_row = [today, model_name, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
             writer = csv.writer(csvfile)
@@ -1691,9 +1685,9 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 ## Run PDDL generation models
-i = 2
-num_trials = 3
-run_iterative_model("o3-mini-2025-01-31", i, i+num_trials) 
+i = 3
+num_trials = 2
+run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed") 
 # run_iterative_model("gpt-4o-2024-05-13", 9, 11)# gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 
