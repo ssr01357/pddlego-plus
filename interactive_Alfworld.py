@@ -1298,7 +1298,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         valid_actions.remove('inventory')
         valid_actions.remove('help') # add help?
 
-        MAX_STEPS = 20
+        MAX_STEPS = 50
 
         brief_obs = "Action: look around\n" + summarize_obs(init_obs)+'\n' # initial definition
         with open(file_name, "a") as f:
@@ -1508,186 +1508,107 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             writer.writerow(data_row)
 
 
-# def run_baseline_model(model_name, start_trials, end_trials):
-#     for trial in range(start_trials, end_trials):
-#         coin_found = False
-#         today = date.today()
-#         file_name = f"output/06_021425_baseline/{today}_{model_name.replace('/','_')}_{trial}.txt"
-#         trial_record = []  # This will be a list of steps; each step is a list of large-loop iteration numbers
 
-#         env = TextWorldExpressEnv(envStepLimit=100)
-#         NUM_LOCATIONS = 11
-#         env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-#         obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-#         with open(file_name, "a") as f:
-#             f.write(f"Observations: {obs} \n")
-#             f.write(f"Gold path: {env.getGoldActionSequence()} \n")
-#             f.write(f"Valid Actions: {infos['validActions']} \n")
-#             f.write(f"taskDescription: {infos['taskDescription']} \n")
+def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=5, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
+    for trial in range(start_trial, end_trial):
+        succeed = False
+        today = date.today()
+        fixed_model_name = model_name.replace("/", "_")
+        folder_path = f"output/{folder_name}"
+        os.makedirs(folder_path, exist_ok=True)
+        file_name = f"{folder_path}/{today}_{fixed_model_name}_{trial}.txt"
+        trial_record = []
 
-#         valid_actions = sorted(infos['validActions'])
-#         if 'look around' in valid_actions:
-#             valid_actions.remove('look around')
-#         if 'inventory' in valid_actions:
-#             valid_actions.remove('inventory')
+        # Setup environment
+        request_infos = textworld.EnvInfos(
+            won=True,
+            admissible_commands=True,
+            score=True,
+            max_score=True,
+            intermediate_reward=True,
+            extras=["expert_plan"]
+        )
+        env_id = textworld.gym.register_game(
+            gamefile,
+            request_infos,
+            max_episode_steps=1000000,
+            wrappers=[AlfredDemangler(), expert]
+        )
+        env = textworld.gym.make(env_id)
+        obs, infos = env.reset()
+        init_obs = obs.split('\n')[2]
+        goal = obs.split('\n')[-1]
+        valid_actions = infos["admissible_commands"]
 
-#         MAX_STEPS = 20
-#         brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
-#         with open(file_name, "a") as f:
-#             f.write(f"brief_obs: {brief_obs} \n")
+        with open(file_name, "a") as f:
+            f.write(f"Trial {trial} - {model_name}\n")
+            f.write(f"Initial Observation: {init_obs}\n")
+            f.write(f"Goal: {goal}\n")
+            f.write(f"Valid Actions: {valid_actions}\n")
 
-#         action_queue = []
-#         obs_queue = []
-#         all_actions = []
-#         successful_actions = []
-#         overall_memory = brief_obs
-#         overall_memory_dic = []  # For recording detailed memory if needed
-#         end_game = False
+        valid_actions = sorted(set(valid_actions) - {'look', 'inventory', 'help'})
+        brief_obs = "Action: look around\n" + summarize_obs(init_obs) + "\n"
+        overall_memory = brief_obs
+        MAX_STEPS = 20
+        all_actions = []
+        successful_actions = []
 
-#         for step_id in range(MAX_STEPS):
-#             with open(file_name, "a") as f:
-#                 f.write(f"\n\n====Step {step_id}==== \n")
-#             trial_step_record = []  # This will record each large-loop try for the current step
-#             within_step_tries = 0
-#             action_passed = False
-#             large_loop_error_message = ""
+        for step_id in range(MAX_STEPS):
+            with open(file_name, "a") as f:
+                f.write(f"\n==== Step {step_id} ====\n")
+            trial_step_record = []
 
-#             # Under each step, try up to 5 large-loop iterations until actions pass.
-#             while within_step_tries < 5 and not action_passed:
-#                 with open(file_name, "a") as f:
-#                     f.write(f"\n----Larger Loop No. {within_step_tries}---- \n")
-#                     f.write(f"successful_actions: {successful_actions} \n")
-#                 within_step_tries += 1
+            # generate action
+            actions = llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory, goal_type=goal_type)
+            if not actions:
+                break
 
-#                 if within_step_tries > 1:  # For subsequent tries, reset the environment
-#                     env = TextWorldExpressEnv(envStepLimit=100)
-#                     NUM_LOCATIONS = 11
-#                     env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-#                     obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-#                     for act in successful_actions:
-#                         obs, reward, done, infos = env.step(act)
+            with open(file_name, "a") as f:
+                f.write(f"Generated Actions: {actions}\n")
 
-#                 # Reset action queues and temporary memory for this large-loop iteration.
-#                 action_queue = []
-#                 tem_action_queue = []
-#                 tem_memory = ""
+            step_success = False
+            for act in actions:
+                obs, reward, done, infos = env.step(act)
+                action_text = "Action: " + act + "\n"
+                obs_text = summarize_obs(obs) + "\n"
+                brief_obs = action_text + obs_text
+                overall_memory += brief_obs
+                all_actions.append(act)
 
-#                 start_checkpoint = True
-#                 while start_checkpoint or action_queue:
-#                     with open(file_name, "a") as f:
-#                         f.write(f"Small Loop, action_queue: {action_queue} \n")
-#                     start_checkpoint = False
+                with open(file_name, "a") as f:
+                    f.write(f"> {act}\n{brief_obs}\n")
+                    f.write(f"Remaining Actions: {infos['admissible_commands']}\n")
 
-#                     if not action_queue:
-#                         if obs_queue:
-#                             brief_obs = "\n".join(obs_queue)
-#                             obs_queue = []
-#                         # Generate actions using the baseline LLM function.
-#                         actions = llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory, large_loop_error_message)
-#                         with open(file_name, "a") as f:
-#                             f.write(f"Generated actions: {actions} \n")
+                if infos["won"]:
+                    with open(file_name, "a") as f:
+                        f.write("Success! Task completed.\n")
+                    succeed = True
+                    step_success = True
+                    break
 
-#                         if actions:
-#                             action_queue.extend(actions)
-#                             tem_action_queue.extend(actions)
-#                             all_actions.extend(actions)
-#                         else:
-#                             end_game = True
-#                             break
+            trial_record.append(step_id)
+            if succeed or not step_success:
+                break
 
-#                     with open(file_name, "a") as f:
-#                         f.write(f"Current action_queue: {action_queue} \n")
-#                     taken_action = action_queue.pop(0)
-#                     obs, reward, done, infos = env.step(taken_action)
-
-#                     # Immediately end the game if coin is found.
-#                     if "coin" in obs:
-#                         taken_action = "take coin"
-#                         obs, reward, done, infos = env.step(taken_action)
-#                         end_game = True
-#                         with open(file_name, "a") as f:
-#                             f.write("Coin found!\n")
-#                         coin_found = True
-#                         break
-
-#                     action_text = "Action: " + taken_action + "\n"
-#                     obs_text = summarize_obs(obs) + "\n"
-#                     brief_obs = action_text + obs_text
-#                     obs_queue.append(brief_obs)
-#                     with open(file_name, "a") as f:
-#                         f.write(f"> {taken_action} \n {brief_obs} \n")
-
-#                     # Check for common errors in the observation and update the error message.
-#                     if "You can't move there, the door is closed." in brief_obs:
-#                         large_loop_error_message = (
-#                             f"This is the action you take: {taken_action}. "
-#                             "The door that you are moving to is closed. "
-#                             "You should first open the door to that direction then move there!"
-#                         )
-#                         break
-#                     elif "That is already open." in brief_obs:
-#                         large_loop_error_message = (
-#                             f"This is the action you take: {taken_action}. "
-#                             "You try to open a door that is already open. You already visited here. "
-#                             "Make sure the status of door is correct."
-#                         )
-#                         break
-#                     elif "I'm not sure what you mean." in brief_obs:
-#                         if "open door" in taken_action:
-#                             large_loop_error_message = (
-#                                 f"This is the action you take: {taken_action}. "
-#                                 "When you try to open door, there is no door here or nothing in that direction. "
-#                                 "If there is no door, you can directly move to that direction.\n"
-#                             )
-#                         elif "move" in taken_action:
-#                             large_loop_error_message = (
-#                                 f"This is the action you take: {taken_action}. "
-#                                 "You cannot move to that direction. Review your action predicates and the problem files to check the status."
-#                             )
-#                         else:
-#                             large_loop_error_message = (
-#                                 f"This is the action you take: {taken_action}. "
-#                                 "You got the environment error!"
-#                             )
-#                         break
-
-#                     tem_memory += brief_obs
-#                     overall_memory_dic.append({"type": "action", "content": taken_action})
-#                     overall_memory_dic.append({"type": "observation", "content": summarize_obs(obs)})
-
-#                     if not action_queue:
-#                         action_passed = True
-#                         successful_actions.extend(tem_action_queue)
-#                         overall_memory += tem_memory
-
-#                 # Record this large-loop iteration result for the step.
-#                 trial_step_record.append(within_step_tries)
-#                 if (within_step_tries == 5 and not action_passed) or end_game:
-#                     end_game = True
-#                     break
-
-#             trial_record.append(trial_step_record)
-#             if end_game:
-#                 break
-
-#         with open("output/baseline_results.csv", "a", newline="") as csvfile:
-#             # Write out: date, model_name, trial, coin_found, last step index, last large-loop iteration, and the full trial record.
-#             data_row = [today, model_name, trial, coin_found, len(trial_record)-1, trial_record[-1] if trial_record else None, trial_record]
-#             writer = csv.writer(csvfile)
-#             writer.writerow(data_row)
+        # Final logging
+        with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            data_row = [today, model_name, trial, succeed, len(trial_record)-1 if trial_record else -1, trial_record]
+            writer.writerow(data_row)
 
 
 ## Run baseline models
-# run_baseline_model("gpt-4o-mini-2024-07-18", 0, 2)
-# run_baseline_model("o3-mini-2025-01-31", 0, 10)
-# run_baseline_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 3, 10) # models--google--gemma-2-27b-it
-# run_baseline_model("google/gemma-2-27b-it", 0, 10)
+# run_baseline_alfworld("gpt-4o-mini-2024-07-18", 0, 2)
+run_baseline_alfworld("o3-mini-2025-01-31", 0, 2, folder_name="10_040825_alfworld_baseline_detailed", result_name="alfworld_baseline_detailed", goal_type="detailed")
+# run_baseline_alfworld("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 3, 10) # models--google--gemma-2-27b-it
+# run_baseline_alfworld("google/gemma-2-27b-it", 0, 10)
 
 
 ## Run PDDL generation models
-i = 3
+i = 0
 num_trials = 2
-run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed") 
+# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed") 
+# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal") 
 # run_iterative_model("gpt-4o-2024-05-13", 9, 11)# gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 
