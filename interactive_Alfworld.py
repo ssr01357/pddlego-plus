@@ -70,6 +70,7 @@ close_source_model_lists = ['o3-mini', 'gpt-4o', 'gpt-4o-2024-05-13', 'o3-mini-2
 def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"):
 
     if model_name in close_source_model_lists: # closed source LLMs
+        client = OpenAI()
         response = client.chat.completions.create(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],
@@ -825,7 +826,7 @@ print(goal)
 print("Valid actions:", valid_actions)
 
 
-def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message = None):
+def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message=None, goal_type='detailed'):
     prompt_format = f"""
         Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
         The format should strictly be:
@@ -874,6 +875,58 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         }
     """
 
+    prompt_obs_action_general_goal = f"""
+        You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
+
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle.
+        
+        Now, {goal}
+        Here are your current observations: {brief_obs}
+
+        The following actions are allowed: 
+        1. go to a receptacle
+            :action GotoLocation
+            :parameters (?from - receptacle ?to - receptacle)
+        2. open a receptacle if it is closed
+            :action OpenObject
+            :parameters (?r - receptacle)
+        3. close a receptacle
+            :action CloseObject
+            :parameters (?r - receptacle)
+        4. take an object from another receptacle
+            :action PickupObject
+            :parameters (?o - object ?r - receptacle)
+        5. put object into/on/in another receptacle
+            :action PutObject
+            :parameters (?o - object ?r - receptacle)
+        6. using an object/receptacle by turning it on/off with a switch
+            :action useObject
+            :parameters (?o - object)
+        7. heat an object using a receptacle
+            :action HeatObject
+            :parameters (?o - object ?r - microwaveReceptacle)
+        8. clean an object using a receptacle
+            :action CleanObject
+            :parameters (?o - object ?r - receptacle)
+        9. cool an object using a receptacle
+            :action CoolObject
+            :parameters (?o - object ?r - fridgeReceptacle)
+        10. slice an object using a sharp object
+            :action SliceObject
+            :parameters (?r - receptacle ?co - object ?sharp_o - object)
+
+        You are in an unfamiliar environment. Your task is to complete the given objective by observing your surroundings and interacting with objects and receptacles.
+        You must build and update PDDL files solely based on what you directly observe. Do not make assumptions.
+
+        General Goal: Find the necessary object(s) and use them appropriately to accomplish the task.
+        Use the allowed actions to explore, discover, and act purposefully. Plan each step based on what you know so far.
+        
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
+    """ 
+
     prompt_obs_action_subgoal = f"""
         You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
 
@@ -898,38 +951,37 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         5. put object into/on/in another receptacle
             :action PutObject
             :parameters (?o - object ?r - receptacle)
-
-        7. examine an object/receptacle
-            :action examineReceptacle
-            :parameters (?r - receptacle)
-        8. using an object/receptacle by turning it on/off with a switch
-        9. heat an object with another object/receptacle
+        6. using an object/receptacle by turning it on/off with a switch
+            :action useObject
+            :parameters (?o - object)
+        7. heat an object using a receptacle
             :action HeatObject
-            :parameters (?l - location ?r - receptacle ?o - object)
-        10. clean an object with another object/receptacle
+            :parameters (?o - object ?r - microwaveReceptacle)
+        8. clean an object using a receptacle
             :action CleanObject
-            :parameters (?l - location ?r - receptacle ?o - object)
-        11. cool an object with another object/receptacle
+            :parameters (?o - object ?r - receptacle)
+        9. cool an object using a receptacle
             :action CoolObject
-            :parameters (?l - location ?r - receptacle ?o - object)
-        12. slice an object with another object/receptacle
+            :parameters (?o - object ?r - fridgeReceptacle)
+        10. slice an object using a sharp object
             :action SliceObject
-            :parameters (?l - location ?co - object ?ko - object)
+            :parameters (?r - receptacle ?co - object ?sharp_o - object)
 
-        You must go to a location in order to use it or take/put objects on it.
+        Your process involves two main stages with the following subgoals:
 
-        The process involves two main stages:
+        Stage 1: Search for the Target Object
+            Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
+            Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
 
-        1. Searching for the Object:
-            In this stage, your goal is to explore and open new, unvisited recepatacles until you find the object mentioned in the task. 
+        Stage 2: Use the Object to Complete the Task
+            Goal 2.1: Pick up the target object using the PickupObject action.
+            Goal 2.2: Move to the appropriate location needed to fulfill the task.
+            Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
 
-        2. Using the Object to Complete the Task:
-            Once you have found the object, update your goal to focus on using it to complete the task.
-            
-        In summary, the first stage is all about finding the object—this might involve traveling to a location and opening it if necessary.
-        
-        Note, some receptacles have numbers in their names. Always keep them as they are. For example, "towelholder1" should not be changed to "towelholder".
-        Your initial goal should always be to go to a new location instead of put something into somewhere.
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
     """ 
 
     prompt_obs_action_detailed = f"""
@@ -976,10 +1028,10 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
 
         The process involves two main stages:
 
-        1. Searching for the Object:
-            In this stage, your goal is to explore and open new, unvisited recepatacles until you find the object mentioned in the task. 
+        1. Always searching for the aim Object first!!!
+            In this stage, your goal is to go to and may need to open new, unvisited recepatacles until you find the object mentioned in the task. Some receptacles cannot be opened so you can directly see what objects after you go to that receptacle.
 
-            You can only use the GotoLocation action to travel to a new location and the OpenObject action (if the location is closed) to verify whether it contains the target object.
+            You can only use the GotoLocation action to travel to a new location and the OpenObject action (if the receptacle is closed) to verify whether it contains the target object.
 
             Goal 1.1: Reach a location that has not been visited (the location should be a receptacle) using the GotoLocation action. 
                 You goal should look like this:
@@ -1000,10 +1052,15 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             If necessary, use the PickupObject action to retrieve the item, and the GotoLocation action to move to the correct place.
             Then, apply the object in a purposeful way — not just move it — but interact with the environment to fulfill the task’s actual goal.
 
+            Note: if you want to heat, clean, and cool an object, you can go to that receptacle then do the action directly without put the object into that receptacle.
+                But if you want to slice an object, you should first go to the receptacle and pick up the sharp object then do the slice action.
+
         In summary, the first stage is all about finding the object—this might involve going to an unvisited receptacle and opening it if necessary.
         
-        Note, some receptacles have numbers in their names. Always keep them as they are. For example, "towelholder1" should not be changed to "towelholder".
-        Your initial goal should always be to go to a new location instead of put something into somewhere.
+        Note: 
+        1. some receptacles have numbers in their names. Always keep them as they are. For example, "towelholder1" should not be changed to "towelholder".
+        2. Your initial goal should always be to go to a new location instead of put something into somewhere.
+        3. Do not enter stage 2 when not finishing stage 1.
     """ 
 
     prompt_prev_files = f"""
@@ -1042,8 +1099,14 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         prompt = prompt_edit
 
     # all prompts should have observations and actions
-    # select which prompt version to use: prompt_obs_action_detailed or prompt_obs_action_general or prompt_obs_action_subgoal
-    prompt += prompt_obs_action_detailed
+    # select which prompt version to use: prompt_obs_action_detailed or prompt_obs_action_general_goal or prompt_obs_action_subgoal
+    # default is detailed
+    if goal_type == 'detailed':
+        prompt += prompt_obs_action_detailed
+    elif goal_type == 'subgoal':
+        prompt += prompt_obs_action_subgoal
+    else:
+        prompt += prompt_obs_action_general_goal
 
     if prev_df and prev_pf:
         prompt += prompt_prev_files
@@ -1070,8 +1133,6 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         df, pf = run_llm_model(prompt, model_name)
 
     err = None #error_message(df, pf)
-    # check err and its df & pf here:
-    # ....
     return df, pf, err, prompt
 
 
@@ -1414,9 +1475,10 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         if "open" in taken_action:
                             large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to open a receptacle but nothing happens. 
                             You should first go to this receptacle to open it. 
-                            But if you have already go to this receptacle and still seeing this error message, it means that this receptacle cannot be opened and you can directly see objects after you go to it."""
+                            But if you have already go to this receptacle and still seeing this error message, it means that this receptacle cannot be opened and you can directly see objects after you go to it. Do not try to open it!!"""
                         elif "take" in taken_action:
-                            large_loop_error_message = f"This is the action you take: {taken_action}. You are trying to take something not existed from that receptacle. You should go to other receptacle to find your aim object."
+                            large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to take something not existed from that receptacle.
+                            You should go to other receptacle to find your aim object. Remember do not assume you can take the object from the receptable but should always set the initial goal as finding that aim object."""
                         elif "move" in taken_action:
                             large_loop_error_message = f"""This is the action you take: {taken_action}.
                             You want to move some object to a receptacle but failed. You should first find that object somewhere by going to an unvisited receptacle and open if necessary.
@@ -1629,13 +1691,13 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 ## Run PDDL generation models
-i = 0
-num_trials = 2
+i = 2
+num_trials = 3
 run_iterative_model("o3-mini-2025-01-31", i, i+num_trials) 
 # run_iterative_model("gpt-4o-2024-05-13", 9, 11)# gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 
-run_iterative_model("deepseek", i, i+num_trials) 
+# run_iterative_model("deepseek", i, i+num_trials) 
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
 
 
