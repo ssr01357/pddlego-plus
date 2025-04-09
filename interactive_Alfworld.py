@@ -1053,7 +1053,8 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
                 ) where recepatacle should be the recepatacle you want to open.
 
         2. Using the Object to Complete the Task:
-            Once you have located and picked up the object, update your goal to focus on how the object is used to complete the task. This may involve more than simply transferring it from one place to another.
+            After you have located the object, you should always first pick up the object from that receptacle and update your goal to focus on how the object is used to complete the task. 
+            This may involve more than simply transferring it from one place to another.
             For example: You might examine the object or a nearby receptacle to gather information. You may need to use another tool or device (like a lamp or a switch). Some tasks require you to slice, heat, cool, or clean the object using an appropriate receptacle (e.g., microwave, sink, fridge).
 
             If necessary, use the PickupObject action to retrieve the item, and the GotoLocation action to move to the correct place.
@@ -1142,116 +1143,6 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     err = None #error_message(df, pf)
     return df, pf, err, prompt
 
-
-# ==== Merging method helper functions ====
-# Merging method: Without previous problem file but only feeding observations
-# def generate_problem_file_from_observation(observation, model_name="o3-mini", domain_file="", err="", err_2=""):
-#     prompt = f"""
-#         You are in an environment that you explore step by step. Your job is to build a PDDL problem file strictly based on your current observation—do not add information that has not been observed. In particular:
-#         - Do not invent objects or rooms that are not mentioned.
-#         - Do not omit any details from the observation. Be sure to include every item you observed, such as any closed door or room on one direction.
-#         - Include only the relevant objects, initial states, and goals that directly reflect this observation.
-#         - The problem file must be self-contained with the sections (:objects ...), (:init ...), and (:goal ...).
-#         - Your valid actions are exactly:
-#             1. :action open-door  
-#             :parameters (?loc1 - location ?loc2 - location ?dir - direction)
-#             2. :action move  
-#             :parameters (?from - location ?to - location ?dir - direction)
-#         - The goal must be in the format:
-#             (:goal (at ?location))
-#         where “?location” is a location that has not yet been visited.
-
-#         You are given the following domain file as context (if provided):
-#         {domain_file}
-#         If it is empty, ignore this context.
-
-#         Now, build a PDDL **problem file** solely based on this observation:
-#         {observation}
-#         *Note: You do not have access to any previous problem file.*
-
-#         Output strictly in JSON format with the following structure:
-#         {{
-#             "pf": "CONTENT_OF_THE_PROBLEM_FILE"
-#         }}
-#     """
-#     result = run_llm_model(prompt, model_name=model_name)
-#     # Assuming run_llm_model returns a dict with key "pf"
-#     pf = result.get("pf") if isinstance(result, dict) else result[1]
-#     return pf
-
-# def merge_problem_files_llm(old_problem_file, new_problem_file, model_name="o3-mini"):
-#     prompt = f"""
-#         You have two problem files (PDDL). The old problem file:
-#         <<<
-#         {old_problem_file}
-#         >>>
-
-#         The new problem file based on the new observation:
-#         <<<
-#         {new_problem_file}
-#         >>>
-
-#         Merge them so that:
-#         - You include any new objects or init facts from the new PF if they are truly new.
-#         - You do not lose any critical old PF objects or init facts that are still valid.
-#         - The final goal should reflect both ensuring the new place is discovered or consistent with your exploration aim.
-
-#         Output strictly in JSON:
-#         {{
-#         "pf": "YOUR_FINAL_MERGED_PROBLEM_FILE"
-#         }}
-#     """
-
-#     _df, merged_pf = run_llm_model(prompt, model_name=model_name)
-#     return merged_pf
-
-# def merge_problem_files_code(old_pf: str, new_pf: str) -> str:
-    # 1. Extract objects, init, goal from old_pf
-    old_objects = []
-    old_init = []
-    old_goal = []
-    # (Write your parser code for old_pf below or call an existing parser.)
-
-    # 2. Extract objects, init, goal from new_pf
-    new_objects = []
-    new_init = []
-    new_goal = []
-    # (Write your parser code for new_pf below.)
-
-    # 3. Merge objects
-    # For example, unify sets:
-    final_objects_set = set(old_objects) | set(new_objects)
-
-    # 4. Merge init
-    # For instance, unify sets again. Remove duplicates.
-    final_init_set = set(old_init) | set(new_init)
-
-    # 5. Choose or unify the goal
-    # If your approach is "always last known goal," or "union of old + new," do it here.
-    # For example, choose new PF's goal if you want the "latest location" to be the goal:
-    final_goal = new_goal if new_goal else old_goal
-
-    # 6. Rebuild the PF with the merged sections:
-    final_pf = f"""
-        (define (problem MergedProblem)
-        (:domain MyDomain)
-
-        (:objects
-            {' '.join(sorted(list(final_objects_set)))}
-        )
-
-        (:init
-            {"    ".join(sorted(list(final_init_set)))}
-        )
-
-        (:goal
-            {" ".join(final_goal)}
-        )
-        )
-    """
-
-    # Return the merged PF string
-    return final_pf
 
 # Set up baseline model: get actions directly from model
 def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None, goal_type="detailed"):
@@ -1649,7 +1540,11 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
                     if "Nothing happens." in brief_obs:
-                        if "open" in taken_action:
+                        if "go to" in taken_action:
+                            large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to go to a receptacle but nothing happens. 
+                            You may already been at this receptacle, in other words, you have already went to this place and do not need to go to this receptacle again.
+                            Otherwise, there is no the receptacle you are aiming to."""
+                        elif "open" in taken_action:
                             large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to open a receptacle but nothing happens. 
                             You should first go to this receptacle to open it. 
                             But if you have already go to this receptacle and still seeing this error message, it means that this receptacle cannot be opened and you can directly see objects after you go to it. Do not try to open it!!"""
@@ -1853,11 +1748,11 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 ## Run PDDL generation models
-i = 6
-num_trials = 1
-run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
-# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
-# run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+i = 0
+num_trials = 5
+run_iterative_model("o3-mini-2025-01-31", 1, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
