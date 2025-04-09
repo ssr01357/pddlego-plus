@@ -36,25 +36,41 @@ print('finishing import')
 # os.environ["OPENAI_API_KEY"] = ""
 
 # Solver set up
-def run_solver(domain_file, problem_file, solver):
+def run_solver(domain_file, problem_file, solver, max_retries=3):
     # domain_file = open(f'domain.pddl').read()
     # problem_file = open(f'problem.pddl').read()
 
     req_body = {"domain" : domain_file, "problem" : problem_file}
 
-    # Send job request to solve endpoint
-    solve_request_url=requests.post(f"https://solver.planning.domains:5001/package/{solver}/solve", json=req_body).json()
+    retries = 0
 
-    # Query the result in the job
-    celery_result=requests.post('https://solver.planning.domains:5001' + solve_request_url['result'])
+    while retries < max_retries:
+        try:
+            # Send job request to solve endpoint
+            solve_request_url = requests.post(
+                f"https://solver.planning.domains:5001/package/{solver}/solve", 
+                json=req_body
+            ).json()
 
-    while celery_result.json().get("status","")== 'PENDING':
-        # Query the result every 0.5 seconds while the job is executing
-        celery_result=requests.post('https://solver.planning.domains:5001' + solve_request_url['result'])
-        time.sleep(0.5)
+            # Query the result in the job
+            celery_result = requests.post(
+                'https://solver.planning.domains:5001' + solve_request_url['result']
+            )
 
-    result = celery_result.json()['result']
-    return result
+            while celery_result.json().get("status", "") == 'PENDING':
+                time.sleep(0.5)
+                celery_result = requests.post(
+                    'https://solver.planning.domains:5001' + solve_request_url['result']
+                )
+
+            return celery_result.json()['result']
+
+        except Exception as e:
+            print(f"Error encountered: {e}. Retrying in 5 seconds... (Attempt {retries+1}/{max_retries})")
+            retries += 1
+            time.sleep(5)
+
+    raise RuntimeError("Max retries exceeded. Failed to get result from solver.")
 
 def get_action_from_pddl(df, pf):
     # run_fast_downward(path_to_df, path_to_pf)
@@ -1562,7 +1578,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         elif "cool" in taken_action:
                             large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to cool an object with a fridge. 
                             You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
-                        elif "fridge" in taken_action and ("move" in taken_action or "take" in taken_action):
+                        elif "fridge" in taken_action and ("move" in taken_action or "take" in taken_action): # pass this
                             large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to move or take an object to or from a fridge. 
                             You don't need to take this action! You should go to fridge receptacle, cool the object, go to another receptacle"""
                         break
@@ -1750,9 +1766,9 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 ## Run PDDL generation models
 i = 0
 num_trials = 5
-run_iterative_model("o3-mini-2025-01-31", 1, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+# run_iterative_model("o3-mini-2025-01-31", 1, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
 run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
-run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+# run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
