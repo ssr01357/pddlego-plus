@@ -1059,7 +1059,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             If necessary, use the PickupObject action to retrieve the item, and the GotoLocation action to move to the correct place.
             Then, apply the object in a purposeful way — not just move it — but interact with the environment to fulfill the task’s actual goal.
 
-            Note: if you want to heat, clean, and cool an object, you can go to that receptacle then do the action directly without put the object into that receptacle.
+            Hint: if you want to heat, clean, and cool an object, after you go to that aim receptacle, do not put the object in the receptacle but do the action directly. For example, go to fridge, then cool the object with receptacle.
                 But if you want to slice an object, you should first go to the receptacle and pick up the sharp object then do the slice action.
 
         In summary, the first stage is all about finding the object—this might involve going to an unvisited receptacle and opening it if necessary.
@@ -1254,8 +1254,6 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     return final_pf
 
 # Set up baseline model: get actions directly from model
-
-
 def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None, goal_type="detailed"):
     prompt_general = f"""
         You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
@@ -1666,6 +1664,9 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         elif "slice" in taken_action:
                             large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to slice an object with a sharp object.
                             You should first pickup the sharp object then take the slice action"""
+                        elif "cool" in taken_action:
+                            large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to cool an object with a fridge. 
+                            You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
                         break
 
                     # append into overall memory and dictionary format
@@ -1806,16 +1807,19 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     if "Nothing happens." in brief_obs:
                         if "open" in act:
                             large_loop_error_message = f"""This is the action you take: {act}. You are trying to open a receptacle but nothing happens. 
-You should first go to this receptacle to open it. If you already did, and still see this message, it means this receptacle cannot be opened."""
+                                    You should first go to this receptacle to open it. If you already did, and still see this message, it means this receptacle cannot be opened."""
                         elif "take" in act:
                             large_loop_error_message = f"""This is the action you take: {act}. You are trying to take something that does not exist. 
-Explore more receptacles and make sure the object exists."""
+                                    Explore more receptacles and make sure the object exists."""
                         elif "move" in act:
                             large_loop_error_message = f"""This is the action you take: {act}. You tried to move an object but failed. 
-Ensure you have the object in inventory before placing it."""
+                                    Ensure you have the object in inventory before placing it."""
                         elif "slice" in act:
                             large_loop_error_message = f"""This is the action you take: {act}. You are trying to slice an object without the proper tool. 
-You need to pick up the sharp object first."""
+                                    You need to pick up the sharp object first."""
+                        elif "cool" in act:
+                            large_loop_error_message = f"""This is the action you take: {act}. You are trying to cool an object with a fridge. 
+                                    You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
                         break
 
                 if action_passed:
