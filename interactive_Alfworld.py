@@ -1606,8 +1606,9 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         with open(f"output/{result_name}.csv", "a", newline="") as csvfile: 
             # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
             game_type = 'cool' # heat, clean, cool, slice, basic
+            model_type = 'PDDL' # baseline
             prompt_type = 'detailed' # detailed, subgoal
-            data_row = [today, model_name, game_type, prompt_type, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
+            data_row = [today, model_name, model_type, game_type, prompt_type, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
             writer = csv.writer(csvfile)
             writer.writerow(data_row)
 

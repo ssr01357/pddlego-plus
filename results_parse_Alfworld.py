@@ -1,33 +1,28 @@
 import pandas as pd
 import ast
 
-# Read CSV data.
-# Updated Columns (in order):
-# date, model, game_type, prompt_type, game_id, succeed, final_step_index, last_attempt_str, steps_str
+# Read CSV data
 df = pd.read_csv("output/alfworld_detailed_results.csv", header=None, 
-                 names=["date", "model", "game_type", "prompt_type", "game_id", "succeed", 
+                 names=["date", "model", "model_type", "game_type", "prompt_type", "game_id", "succeed", 
                         "final_step_index", "last_attempt_str", "steps_str"])
 
-# Convert succeed column to Boolean.
+# Convert succeed column to Boolean
 df["succeed"] = df["succeed"].astype(str).map({"True": True, "False": False})
 
 def analyze_game(row):
-    """
-    Analyze one game (row) and return metrics, based on solver/simulation errors and abort types.
-    """
     try:
         steps_list = ast.literal_eval(row["steps_str"])
     except Exception as e:
         print(f"Error parsing steps for row {row.name}: {e}")
         return None
-    
+
     num_steps = len(steps_list)
-    
     solver_errors = 0
     solver_fixed = 0
+
     for i, step in enumerate(steps_list):
         for j, attempt in enumerate(step):
-            large_loop, small_loop = attempt
+            _, small_loop = attempt
             if small_loop != 0:
                 solver_errors += 1
                 if not (i == num_steps - 1 and j == len(step) - 1):
@@ -61,23 +56,27 @@ def analyze_game(row):
         "abort_simulation": abort_simulation,
     }
 
-# Apply per-game analysis.
+# Apply per-game analysis
 metrics = df.apply(analyze_game, axis=1)
 metrics_df = pd.DataFrame(metrics.tolist())
 
-# Combine metrics with identifiers
-df_metrics = pd.concat([df[["model", "game_type", "prompt_type"]], metrics_df], axis=1)
+# Combine metrics with identifiers (include model_type now)
+df_metrics = pd.concat([df[["model_type", "model", "game_type", "prompt_type"]], metrics_df], axis=1)
 
-# === Optional grouping ===
-group_keys = ["model", "prompt_type"]  # You can add "game_type" if needed
-# group_keys = ["model", "game_type", "prompt_type"]  # <-- Uncomment for 3-level group
+# === Flexible group key setup ===
+# You can modify this as needed:
+# group_keys = ["model_type", "model", "prompt_type"]
+group_keys = ["model_type", "model", "game_type", "prompt_type"]  # for more granularity
 
+# Filter successes and failures
 df_success = df_metrics[df_metrics["succeed"] == 1]
 df_failure = df_metrics[df_metrics["succeed"] == 0]
 
+# Compute average steps
 avg_steps_success = df_success.groupby(group_keys)["steps"].mean().rename("avg_steps_success")
 avg_steps_failure = df_failure.groupby(group_keys)["steps"].mean().rename("avg_steps_failure")
 
+# Aggregate results
 grouped = df_metrics.groupby(group_keys).agg(
     succeed_count=("succeed", "sum"),
     total_solver_errors=("solver_errors", "sum"),
@@ -88,7 +87,7 @@ grouped = df_metrics.groupby(group_keys).agg(
     total_abort_simulation=("abort_simulation", "sum")
 )
 
-result = grouped.join(avg_steps_success, how="left").join(avg_steps_failure, how="left")
-result = result.reset_index()
+# Merge in the average step metrics
+result = grouped.join(avg_steps_success, how="left").join(avg_steps_failure, how="left").reset_index()
 
 print(result)
