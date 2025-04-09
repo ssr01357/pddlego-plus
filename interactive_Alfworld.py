@@ -1667,6 +1667,9 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         elif "cool" in taken_action:
                             large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to cool an object with a fridge. 
                             You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
+                        elif "fridge" in taken_action and ("move" in taken_action or "take" in taken_action):
+                            large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to move or take an object to or from a fridge. 
+                            You don't need to take this action! You should go to fridge receptacle, cool the object, go to another receptacle"""
                         break
 
                     # append into overall memory and dictionary format
@@ -1850,15 +1853,15 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 ## Run PDDL generation models
-i = 5
-num_trials = 2
+i = 6
+num_trials = 1
 run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
-run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
-run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+# run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
 
-run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
-run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
-run_iterative_model("deepseek", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
+# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
+# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
+# run_iterative_model("deepseek", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
 
 # run_iterative_model("gpt-4o-2024-05-13", 9, 11)# gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
