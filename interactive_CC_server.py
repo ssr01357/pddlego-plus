@@ -1137,11 +1137,14 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             writer.writerow(data_row)
 
 
-def run_baseline_model(model_name, start_trials, end_trials):
+def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031825_alfworld", result_name="alfworld_results"):
     for trial in range(start_trials, end_trials):
         coin_found = False
         today = date.today()
-        file_name = f"output/06_021425_baseline/{today}_{model_name.replace('/','_')}_{trial}.txt"
+        fixed_model_name = model_name.replace("/", "_")
+        folder_path = f"output/{folder_name}"
+        os.makedirs(folder_path, exist_ok=True)
+        file_name = f"{folder_path}/{today}_{fixed_model_name}_{trial}.txt"
         trial_record = []  # This will be a list of steps; each step is a list of large-loop iteration numbers
 
         env = TextWorldExpressEnv(envStepLimit=100)

@@ -32,7 +32,7 @@ from alfworld.agents.environment.alfred_tw_env import AlfredExpert, AlfredDemang
 from openai import OpenAI
 print('finishing import')
 
-client = OpenAI()
+# client = OpenAI()
 # os.environ["OPENAI_API_KEY"] = ""
 
 # Solver set up
@@ -99,8 +99,8 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
         return df, pf
     elif model_name == 'deepseek':
-        apiKey = os.getenv("deepseek_API")
-        client = OpenAI(api_key=apiKey, base_url="https://api.deepseek.com")
+        deepseekAPI = os.getenv("deepseek_API")
+        client = OpenAI(api_key=deepseekAPI, base_url="https://api.deepseek.com")
 
         response = client.chat.completions.create(
             model="deepseek-chat",
@@ -202,6 +202,7 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 # Set up baseline model: get actions directly from model
 def run_gpt_for_actions_baseline(prompt, model_name):
     if model_name in close_source_model_lists: # closed source LLMs
+        client = OpenAI()
         response = client.chat.completions.create(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],
@@ -237,6 +238,32 @@ def run_gpt_for_actions_baseline(prompt, model_name):
             raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
 
         return actions
+    elif model_name == 'deepseek':
+        deepseekAPI = os.getenv("deepseek_API")
+        client = OpenAI(api_key=deepseekAPI, base_url="https://api.deepseek.com")
+
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": "You are generating PDDL according to your observations."},
+                {"role": "user", "content": prompt},
+            ],
+            stream=False
+        )
+
+        response_content = response.choices[0].message.content
+
+        if response_content.startswith("```json"):
+            response_content = response_content.lstrip("```json").rstrip("```").strip()
+
+        result = json.loads(response_content)
+        df = result.get("df", None)
+        pf = result.get("pf", None)
+
+        # if df is None or pf is None:
+        #     raise ValueError("Missing 'df' or 'pf' in the response. Check the prompt or the model output.")
+
+        return df, pf
         
     else: # Open source LLMs
         """
@@ -303,26 +330,6 @@ def run_gpt_for_actions_baseline(prompt, model_name):
 
         return actions
 
-def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None):
-    prompt = f"""
-        You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
-        Here are your current observations: {brief_obs}
-        Here are some valid actions you can take: {valid_actions}
-        Your goal is to explore new locations and interact with the environment effectively. Ensure actions are logical and do not repeat unnecessarily.
-
-        Additional context:
-        {overall_memory if overall_memory else "No additional memory available."}
-
-        If there are errors or obstacles, here is the message:
-        {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
-
-        Provide the output in strict JSON format like this:
-        {{
-            "actions": ["action1", "action2", ...]
-        }}
-    """
-    actions = run_gpt_for_actions_baseline(prompt, model_name)
-    return actions
 
 
 # VAL setup
@@ -1245,8 +1252,186 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
 
     # Return the merged PF string
     return final_pf
-# ==== Merging method helper functions (end) ====
 
+# Set up baseline model: get actions directly from model
+
+
+def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None, goal_type="detailed"):
+    prompt_general = f"""
+        You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
+        Your task is to interact with objects and receptacles to complete a goal step by step.
+
+        Your specific task goal: {goal if goal else "Explore and interact meaningfully based on available observations."}
+
+        Here are your current observations: {brief_obs}
+
+        Valid actions you can take (follow exactly this format, replacing the parts in brackets with actual object and location names. Do not include any brackets in your output):
+            - go to [towelholder 1]
+            - open [cabinet 2]
+            - take [cloth 1] from [cabinet 3]
+            - move [soap bar 1] to [sink basin 2]
+            - use [desk lamp 1]
+            - heat [bread 1] with [microwave 1]
+            - clean [fork 1] with [sink basin 1]
+            - cool [wine bottle 1] with [fridge 1]
+            - slice [bread 1] with [knife 1]
+        Only replace the object and receptacle names (the words that were inside the brackets) with the actual values from the game environment. Do not change the structure. Do not include brackets.
+
+        Your actions should exactly follow this phrasing — do not invent new formats. Every action must correspond to a valid command from the environment.
+
+        You are in an unfamiliar environment. Your task is to complete the given objective by observing your surroundings and interacting with objects and receptacles.
+        You must build and update PDDL files solely based on what you directly observe. Do not make assumptions.
+
+        General Goal: Find the necessary object(s) and use them appropriately to accomplish the task.
+        Use the allowed actions to explore, discover, and act purposefully. Plan each step based on what you know so far.
+        
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
+        
+        Memory of past steps:
+        {overall_memory if overall_memory else "No additional memory available."}
+
+        If there are errors or obstacles, here is the message:
+        {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
+
+        Provide the output in strict JSON format like this:
+        {{
+            "actions": ["action1", "action2", ...]
+        }}
+    """
+
+    prompt_subgoal = f"""
+        You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
+        Your task is to interact with objects and receptacles to complete a goal step by step.
+
+        Your specific task goal: {goal if goal else "Explore and interact meaningfully based on available observations."}
+
+        Here are your current observations: {brief_obs}
+
+        Valid actions you can take (follow exactly this format, replacing the parts in brackets with actual object and location names. Do not include any brackets in your output):
+            - go to [towelholder 1]
+            - open [cabinet 2]
+            - take [cloth 1] from [cabinet 3]
+            - move [soap bar 1] to [sink basin 2]
+            - use [desk lamp 1]
+            - heat [bread 1] with [microwave 1]
+            - clean [fork 1] with [sink basin 1]
+            - cool [wine bottle 1] with [fridge 1]
+            - slice [bread 1] with [knife 1]
+        Only replace the object and receptacle names (the words that were inside the brackets) with the actual values from the game environment. Do not change the structure. Do not include brackets.
+
+        Your actions should exactly follow this phrasing — do not invent new formats. Every action must correspond to a valid command from the environment.
+
+        Your process involves two main stages with the following subgoals:
+
+        Stage 1: Search for the Target Object
+            Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
+            Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
+
+        Stage 2: Use the Object to Complete the Task
+            Goal 2.1: Pick up the target object using the PickupObject action.
+            Goal 2.2: Move to the appropriate location needed to fulfill the task.
+            Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
+
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
+
+        Memory of past steps:
+        {overall_memory if overall_memory else "No additional memory available."}
+
+        If there are errors or obstacles, here is the message:
+        {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
+
+        Provide the output in strict JSON format like this:
+        {{
+            "actions": ["action1", "action2", ...]
+        }}
+    """
+
+    prompt_detailed = f"""
+        You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
+        Your task is to interact with objects and receptacles to complete a goal step by step.
+
+        Your specific task goal: {goal if goal else "Explore and interact meaningfully based on available observations."}
+
+        Here are your current observations: {brief_obs}
+
+        Valid actions you can take (follow exactly this format, replacing the parts in brackets with actual object and location names. Do not include any brackets in your output):
+            - go to [towelholder 1]
+            - open [cabinet 2]
+            - take [cloth 1] from [cabinet 3]
+            - move [soap bar 1] to [sink basin 2]
+            - use [desk lamp 1]
+            - heat [bread 1] with [microwave 1]
+            - clean [fork 1] with [sink basin 1]
+            - cool [wine bottle 1] with [fridge 1]
+            - slice [bread 1] with [knife 1]
+        Only replace the object and receptacle names (the words that were inside the brackets) with the actual values from the game environment. Do not change the structure. Do not include brackets.
+
+        Your actions should exactly follow this phrasing — do not invent new formats. Every action must correspond to a valid command from the environment.
+
+        You must go to a receptacle first in order to use/open it or take/put objects from/on it.
+
+        The process involves two main stages:
+
+        1. Always searching for the aim Object first!!!
+            In this stage, your goal is to go to and may need to open new, unvisited recepatacles until you find the object mentioned in the task. Some receptacles cannot be opened so you can directly see what objects after you go to that receptacle.
+
+            You can only use the GotoLocation action to travel to a new location and the OpenObject action (if the receptacle is closed) to verify whether it contains the target object.
+
+            Goal 1.1: Reach a location that has not been visited (the location should be a receptacle) using the GotoLocation action. 
+                You goal should look like this:
+                (:goal 
+                    (at ?recepatacle)
+                ) where recepatacle should be somewhere or some recepatacles not visited.
+
+            Goal 1.2: If you already go to the recepatacle and found the recepatacle is closed, use the OpenObject action to open it and inspect the contents. 
+                Your goal should look like this:
+                (:goal 
+                    (opened ?recepatacle)
+                ) where recepatacle should be the recepatacle you want to open.
+
+        2. Using the Object to Complete the Task:
+            Once you have located and picked up the object, update your goal to focus on how the object is used to complete the task. This may involve more than simply transferring it from one place to another.
+            For example: You might examine the object or a nearby receptacle to gather information. You may need to use another tool or device (like a lamp or a switch). Some tasks require you to slice, heat, cool, or clean the object using an appropriate receptacle (e.g., microwave, sink, fridge).
+
+            If necessary, use the PickupObject action to retrieve the item, and the GotoLocation action to move to the correct place.
+            Then, apply the object in a purposeful way — not just move it — but interact with the environment to fulfill the task’s actual goal.
+
+            Note: if you want to heat, clean, and cool an object, you can go to that receptacle then do the action directly without put the object into that receptacle.
+                But if you want to slice an object, you should first go to the receptacle and pick up the sharp object then do the slice action.
+
+        In summary, the first stage is all about finding the object—this might involve going to an unvisited receptacle and opening it if necessary.
+        
+        Note: 
+        1. some receptacles have numbers in their names. Always keep them as they are. For example, "towelholder1" should not be changed to "towelholder".
+        2. Your initial goal should always be to go to a new location instead of put something into somewhere.
+        3. Do not enter stage 2 when not finishing stage 1.
+
+        Memory of past steps:
+        {overall_memory if overall_memory else "No additional memory available."}
+
+        If there are errors or obstacles, here is the message:
+        {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
+
+        Provide the output in strict JSON format like this:
+        {{
+            "actions": ["action1", "action2", ...]
+        }}
+    """
+    if goal_type == 'detailed':
+        prompt = prompt_detailed
+    elif goal_type == 'subgoal':
+        prompt = prompt_subgoal
+    else:
+        prompt = prompt_general
+
+    actions = run_gpt_for_actions_baseline(prompt, model_name)
+    return actions
 
 # Main functions here:
 def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial = 0, end_trial = 11, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
@@ -1508,7 +1693,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             writer.writerow(data_row)
 
 
-
 def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=5, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
     for trial in range(start_trial, end_trial):
         succeed = False
@@ -1519,7 +1703,6 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         file_name = f"{folder_path}/{today}_{fixed_model_name}_{trial}.txt"
         trial_record = []
 
-        # Setup environment
         request_infos = textworld.EnvInfos(
             won=True,
             admissible_commands=True,
@@ -1528,6 +1711,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             intermediate_reward=True,
             extras=["expert_plan"]
         )
+
         env_id = textworld.gym.register_game(
             gamefile,
             request_infos,
@@ -1539,6 +1723,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         init_obs = obs.split('\n')[2]
         goal = obs.split('\n')[-1]
         valid_actions = infos["admissible_commands"]
+        valid_actions = sorted(set(valid_actions) - {'look', 'inventory', 'help'})
 
         with open(file_name, "a") as f:
             f.write(f"Trial {trial} - {model_name}\n")
@@ -1546,60 +1731,116 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
             f.write(f"Goal: {goal}\n")
             f.write(f"Valid Actions: {valid_actions}\n")
 
-        valid_actions = sorted(set(valid_actions) - {'look', 'inventory', 'help'})
         brief_obs = "Action: look around\n" + summarize_obs(init_obs) + "\n"
         overall_memory = brief_obs
         MAX_STEPS = 20
         all_actions = []
         successful_actions = []
+        obs_queue = []
 
         for step_id in range(MAX_STEPS):
             with open(file_name, "a") as f:
                 f.write(f"\n==== Step {step_id} ====\n")
             trial_step_record = []
+            within_step_tries = 0
+            action_passed = False
+            large_loop_error_message = ""
 
-            # generate action
-            actions = llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory, goal_type=goal_type)
-            if not actions:
-                break
+            while within_step_tries < 5 and not action_passed:
+                with open(file_name, "a") as f:
+                    f.write(f"\n---- Larger Loop No. {within_step_tries} ----\n")
+                    f.write(f"successful_actions: {successful_actions}\n")
 
-            with open(file_name, "a") as f:
-                f.write(f"Generated Actions: {actions}\n")
+                within_step_tries += 1
 
-            step_success = False
-            for act in actions:
-                obs, reward, done, infos = env.step(act)
-                action_text = "Action: " + act + "\n"
-                obs_text = summarize_obs(obs) + "\n"
-                brief_obs = action_text + obs_text
-                overall_memory += brief_obs
-                all_actions.append(act)
+                if within_step_tries > 1:
+                    env_id = textworld.gym.register_game(
+                        gamefile,
+                        request_infos,
+                        max_episode_steps=1000000,
+                        wrappers=[AlfredDemangler(), expert]
+                    )
+                    env = textworld.gym.make(env_id)
+                    obs, infos = env.reset()
+                    for act in successful_actions:
+                        obs, _, _, infos = env.step(act)
+
+                actions = llm_to_actions_baseline(
+                    model_name,
+                    brief_obs,
+                    valid_actions,
+                    overall_memory,
+                    large_loop_error_message,
+                    goal_type=goal_type
+                )
 
                 with open(file_name, "a") as f:
-                    f.write(f"> {act}\n{brief_obs}\n")
-                    f.write(f"Remaining Actions: {infos['admissible_commands']}\n")
+                    f.write(f"Generated Actions: {actions}\n")
 
-                if infos["won"]:
-                    with open(file_name, "a") as f:
-                        f.write("Success! Task completed.\n")
-                    succeed = True
-                    step_success = True
+                if not actions:
                     break
 
-            trial_record.append(step_id)
-            if succeed or not step_success:
+                action_queue = list(actions)
+                tem_action_queue = []
+                tem_memory = ""
+
+                for act in action_queue:
+                    obs, reward, done, infos = env.step(act)
+                    action_text = "Action: " + act + "\n"
+                    obs_text = summarize_obs(obs) + "\n"
+                    brief_obs = action_text + obs_text
+                    tem_memory += brief_obs
+                    all_actions.append(act)
+
+                    with open(file_name, "a") as f:
+                        f.write(f"> {act}\n{brief_obs}\n")
+                        f.write(f"After action '{act}', valid actions: {infos['admissible_commands']}\n")
+
+                    if infos["won"]:
+                        succeed = True
+                        action_passed = True
+                        with open(file_name, "a") as f:
+                            f.write("Success! Task completed.\n")
+                        break
+
+                    if "Nothing happens." in brief_obs:
+                        if "open" in act:
+                            large_loop_error_message = f"""This is the action you take: {act}. You are trying to open a receptacle but nothing happens. 
+You should first go to this receptacle to open it. If you already did, and still see this message, it means this receptacle cannot be opened."""
+                        elif "take" in act:
+                            large_loop_error_message = f"""This is the action you take: {act}. You are trying to take something that does not exist. 
+Explore more receptacles and make sure the object exists."""
+                        elif "move" in act:
+                            large_loop_error_message = f"""This is the action you take: {act}. You tried to move an object but failed. 
+Ensure you have the object in inventory before placing it."""
+                        elif "slice" in act:
+                            large_loop_error_message = f"""This is the action you take: {act}. You are trying to slice an object without the proper tool. 
+You need to pick up the sharp object first."""
+                        break
+
+                if action_passed:
+                    successful_actions.extend(actions)
+                    overall_memory += tem_memory
+                    break
+
+            trial_step_record.append(within_step_tries)
+            trial_record.append(trial_step_record)
+
+            if within_step_tries == 5 or succeed:
                 break
 
-        # Final logging
         with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            data_row = [today, model_name, trial, succeed, len(trial_record)-1 if trial_record else -1, trial_record]
+            data_row = [today, model_name, trial, succeed, len(trial_record)-1 if trial_record else -1, trial_record[-1] if trial_record else None, trial_record]
             writer.writerow(data_row)
+
+
+
 
 
 ## Run baseline models
 # run_baseline_alfworld("gpt-4o-mini-2024-07-18", 0, 2)
-run_baseline_alfworld("o3-mini-2025-01-31", 0, 2, folder_name="10_040825_alfworld_baseline_detailed", result_name="alfworld_baseline_detailed", goal_type="detailed")
+run_baseline_alfworld("o3-mini-2025-01-31", 4, 6, folder_name="10_040825_alfworld_baseline_detailed", result_name="alfworld_baseline_detailed", goal_type="detailed")
 # run_baseline_alfworld("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 3, 10) # models--google--gemma-2-27b-it
 # run_baseline_alfworld("google/gemma-2-27b-it", 0, 10)
 
