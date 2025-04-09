@@ -1560,6 +1560,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                             large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to go to a receptacle but nothing happens. 
                             You may already been at this receptacle, in other words, you have already went to this place and do not need to go to this receptacle again.
                             Otherwise, there is no the receptacle you are aiming to."""
+                            continue
                         elif "open" in taken_action:
                             large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to open a receptacle but nothing happens. 
                             You should first go to this receptacle to open it. 
@@ -1581,6 +1582,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         elif "fridge" in taken_action and ("move" in taken_action or "take" in taken_action): # pass this
                             large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to move or take an object to or from a fridge. 
                             You don't need to take this action! You should go to fridge receptacle, cool the object, go to another receptacle"""
+                            continue
                         break
 
                     # append into overall memory and dictionary format
