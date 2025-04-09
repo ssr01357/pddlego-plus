@@ -1840,25 +1840,24 @@ You need to pick up the sharp object first."""
 
 ## Run baseline models
 # run_baseline_alfworld("gpt-4o-mini-2024-07-18", 0, 2)
-run_baseline_alfworld("o3-mini-2025-01-31", 4, 6, folder_name="10_040825_alfworld_baseline_detailed", result_name="alfworld_baseline_detailed", goal_type="detailed")
+# run_baseline_alfworld("o3-mini-2025-01-31", 4, 6, folder_name="10_040825_alfworld_baseline_detailed", result_name="alfworld_baseline_detailed", goal_type="detailed")
 # run_baseline_alfworld("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 3, 10) # models--google--gemma-2-27b-it
 # run_baseline_alfworld("google/gemma-2-27b-it", 0, 10)
 
 
 ## Run PDDL generation models
-i = 0
+i = 5
 num_trials = 2
-# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed") 
-# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal") 
+run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+
+run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
+run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
+run_iterative_model("deepseek", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
+
 # run_iterative_model("gpt-4o-2024-05-13", 9, 11)# gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 
 # run_iterative_model("deepseek", i, i+num_trials) 
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
-
-
-## Run pf merging models
-
-# run_merging_pf_model("gpt-4o-2024-05-13", 9, 12, merging_method="llm")
-# run_merging_pf_model("gpt-4o-2024-05-13", 0, 2, merging_method="llm")
-# run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")
