@@ -1631,147 +1631,167 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=5, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
     for trial in range(start_trial, end_trial):
-        succeed = False
-        today = date.today()
-        fixed_model_name = model_name.replace("/", "_")
-        folder_path = f"output/{folder_name}"
-        os.makedirs(folder_path, exist_ok=True)
-        file_name = f"{folder_path}/{today}_{fixed_model_name}_{trial}.txt"
-        trial_record = []
+        retry = 0
+        while retry < 2:  # allow up to 2 attempts per trial
+            try:
+                succeed = False
+                today = date.today()
+                fixed_model_name = model_name.replace("/", "_")
+                folder_path = f"output/{folder_name}"
+                os.makedirs(folder_path, exist_ok=True)
+                file_name = f"{folder_path}/{today}_{fixed_model_name}_{trial}.txt"
 
-        request_infos = textworld.EnvInfos(
-            won=True,
-            admissible_commands=True,
-            score=True,
-            max_score=True,
-            intermediate_reward=True,
-            extras=["expert_plan"]
-        )
+                if retry == 1 and os.path.exists(file_name):
+                    open(file_name, 'w').close()  # empty file
+                    print(f"[Trial {trial}] Retrying: cleared file and retrying...")
+                trial_record = []
 
-        env_id = textworld.gym.register_game(
-            gamefile,
-            request_infos,
-            max_episode_steps=1000000,
-            wrappers=[AlfredDemangler(), expert]
-        )
-        env = textworld.gym.make(env_id)
-        obs, infos = env.reset()
-        init_obs = obs.split('\n')[2]
-        goal = obs.split('\n')[-1]
-        valid_actions = infos["admissible_commands"]
-        valid_actions = sorted(set(valid_actions) - {'look', 'inventory', 'help'})
-
-        with open(file_name, "a") as f:
-            f.write(f"Trial {trial} - {model_name}\n")
-            f.write(f"Initial Observation: {init_obs}\n")
-            f.write(f"Goal: {goal}\n")
-            f.write(f"Valid Actions: {valid_actions}\n")
-
-        brief_obs = "Action: look around\n" + summarize_obs(init_obs) + "\n"
-        overall_memory = brief_obs
-        MAX_STEPS = 20
-        all_actions = []
-        successful_actions = []
-        obs_queue = []
-
-        for step_id in range(MAX_STEPS):
-            with open(file_name, "a") as f:
-                f.write(f"\n==== Step {step_id} ====\n")
-            trial_step_record = []
-            within_step_tries = 0
-            action_passed = False
-            large_loop_error_message = ""
-
-            while within_step_tries < 5 and not action_passed:
-                with open(file_name, "a") as f:
-                    f.write(f"\n---- Larger Loop No. {within_step_tries} ----\n")
-                    f.write(f"successful_actions: {successful_actions}\n")
-
-                within_step_tries += 1
-
-                if within_step_tries > 1:
-                    env_id = textworld.gym.register_game(
-                        gamefile,
-                        request_infos,
-                        max_episode_steps=1000000,
-                        wrappers=[AlfredDemangler(), expert]
-                    )
-                    env = textworld.gym.make(env_id)
-                    obs, infos = env.reset()
-                    for act in successful_actions:
-                        obs, _, _, infos = env.step(act)
-
-                actions = llm_to_actions_baseline(
-                    model_name,
-                    brief_obs,
-                    valid_actions,
-                    overall_memory,
-                    large_loop_error_message,
-                    goal_type=goal_type
+                request_infos = textworld.EnvInfos(
+                    won=True,
+                    admissible_commands=True,
+                    score=True,
+                    max_score=True,
+                    intermediate_reward=True,
+                    extras=["expert_plan"]
                 )
 
+                env_id = textworld.gym.register_game(
+                    gamefile,
+                    request_infos,
+                    max_episode_steps=1000000,
+                    wrappers=[AlfredDemangler(), expert]
+                )
+                env = textworld.gym.make(env_id)
+                obs, infos = env.reset()
+                init_obs = obs.split('\n')[2]
+                goal = obs.split('\n')[-1]
+                valid_actions = infos["admissible_commands"]
+                valid_actions = sorted(set(valid_actions) - {'look', 'inventory', 'help'})
+
                 with open(file_name, "a") as f:
-                    f.write(f"Generated Actions: {actions}\n")
+                    f.write(f"Trial {trial} - {model_name}\n")
+                    f.write(f"Initial Observation: {init_obs}\n")
+                    f.write(f"Goal: {goal}\n")
+                    f.write(f"Valid Actions: {valid_actions}\n")
 
-                if not actions:
-                    break
+                brief_obs = "Action: look around\n" + summarize_obs(init_obs) + "\n"
+                overall_memory = brief_obs
+                MAX_STEPS = 20
+                all_actions = []
+                successful_actions = []
+                obs_queue = []
 
-                action_queue = list(actions)
-                tem_action_queue = []
-                tem_memory = ""
-
-                for act in action_queue:
-                    obs, reward, done, infos = env.step(act)
-                    action_text = "Action: " + act + "\n"
-                    obs_text = summarize_obs(obs) + "\n"
-                    brief_obs = action_text + obs_text
-                    tem_memory += brief_obs
-                    all_actions.append(act)
-
+                for step_id in range(MAX_STEPS):
                     with open(file_name, "a") as f:
-                        f.write(f"> {act}\n{brief_obs}\n")
-                        f.write(f"After action '{act}', valid actions: {infos['admissible_commands']}\n")
+                        f.write(f"\n==== Step {step_id} ====\n")
+                    trial_step_record = []
+                    within_step_tries = 0
+                    action_passed = False
+                    large_loop_error_message = ""
 
-                    if infos["won"]:
-                        succeed = True
-                        action_passed = True
+                    while within_step_tries < 5 and not action_passed:
                         with open(file_name, "a") as f:
-                            f.write("Success! Task completed.\n")
+                            f.write(f"\n---- Larger Loop No. {within_step_tries} ----\n")
+                            f.write(f"successful_actions: {successful_actions}\n")
+
+                        within_step_tries += 1
+
+                        if within_step_tries > 1:
+                            env_id = textworld.gym.register_game(
+                                gamefile,
+                                request_infos,
+                                max_episode_steps=1000000,
+                                wrappers=[AlfredDemangler(), expert]
+                            )
+                            env = textworld.gym.make(env_id)
+                            obs, infos = env.reset()
+                            for act in successful_actions:
+                                obs, _, _, infos = env.step(act)
+
+                        actions = llm_to_actions_baseline(
+                            model_name,
+                            brief_obs,
+                            valid_actions,
+                            overall_memory,
+                            large_loop_error_message,
+                            goal_type=goal_type
+                        )
+
+                        with open(file_name, "a") as f:
+                            f.write(f"Generated Actions: {actions}\n")
+
+                        if not actions:
+                            break
+
+                        action_queue = list(actions)
+                        tem_action_queue = []
+                        tem_memory = ""
+
+                        for act in action_queue:
+                            obs, reward, done, infos = env.step(act)
+                            action_text = "Action: " + act + "\n"
+                            obs_text = summarize_obs(obs) + "\n"
+                            brief_obs = action_text + obs_text
+                            tem_memory += brief_obs
+                            all_actions.append(act)
+
+                            with open(file_name, "a") as f:
+                                f.write(f"> {act}\n{brief_obs}\n")
+                                f.write(f"After action '{act}', valid actions: {infos['admissible_commands']}\n")
+
+                            if infos["won"]:
+                                succeed = True
+                                action_passed = True
+                                with open(file_name, "a") as f:
+                                    f.write("Success! Task completed.\n")
+                                break
+
+                            if "Nothing happens." in brief_obs:
+                                if "open" in act:
+                                    large_loop_error_message = f"""This is the action you take: {act}. You are trying to open a receptacle but nothing happens. 
+                                            You should first go to this receptacle to open it. If you already did, and still see this message, it means this receptacle cannot be opened."""
+                                elif "take" in act:
+                                    large_loop_error_message = f"""This is the action you take: {act}. You are trying to take something that does not exist. 
+                                            Explore more receptacles and make sure the object exists."""
+                                elif "move" in act:
+                                    large_loop_error_message = f"""This is the action you take: {act}. You tried to move an object but failed. 
+                                            Ensure you have the object in inventory before placing it."""
+                                elif "slice" in act:
+                                    large_loop_error_message = f"""This is the action you take: {act}. You are trying to slice an object without the proper tool. 
+                                            You need to pick up the sharp object first."""
+                                elif "cool" in act:
+                                    large_loop_error_message = f"""This is the action you take: {act}. You are trying to cool an object with a fridge. 
+                                            You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
+                                break
+
+                        if action_passed:
+                            successful_actions.extend(actions)
+                            overall_memory += tem_memory
+                            break
+
+                    trial_step_record.append(within_step_tries)
+                    trial_record.append(trial_step_record)
+
+                    if within_step_tries == 5 or succeed:
                         break
 
-                    if "Nothing happens." in brief_obs:
-                        if "open" in act:
-                            large_loop_error_message = f"""This is the action you take: {act}. You are trying to open a receptacle but nothing happens. 
-                                    You should first go to this receptacle to open it. If you already did, and still see this message, it means this receptacle cannot be opened."""
-                        elif "take" in act:
-                            large_loop_error_message = f"""This is the action you take: {act}. You are trying to take something that does not exist. 
-                                    Explore more receptacles and make sure the object exists."""
-                        elif "move" in act:
-                            large_loop_error_message = f"""This is the action you take: {act}. You tried to move an object but failed. 
-                                    Ensure you have the object in inventory before placing it."""
-                        elif "slice" in act:
-                            large_loop_error_message = f"""This is the action you take: {act}. You are trying to slice an object without the proper tool. 
-                                    You need to pick up the sharp object first."""
-                        elif "cool" in act:
-                            large_loop_error_message = f"""This is the action you take: {act}. You are trying to cool an object with a fridge. 
-                                    You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
-                        break
+                with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
+                    writer = csv.writer(csvfile)
+                    game_type = 'cool' # heat, clean, cool, slice, basic
+                    model_type = 'baseline' # baseline, PDDL
+                    # prompt_type = 'detailed' # detailed, subgoal
+                    data_row = [today, model_name, model_type, game_type, goal_type, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
 
-                if action_passed:
-                    successful_actions.extend(actions)
-                    overall_memory += tem_memory
-                    break
+                    # data_row = [today, model_name, trial, succeed, len(trial_record)-1 if trial_record else -1, trial_record[-1] if trial_record else None, trial_record]
+                    writer.writerow(data_row)
 
-            trial_step_record.append(within_step_tries)
-            trial_record.append(trial_step_record)
-
-            if within_step_tries == 5 or succeed:
                 break
 
-        with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
-            writer = csv.writer(csvfile)
-            data_row = [today, model_name, trial, succeed, len(trial_record)-1 if trial_record else -1, trial_record[-1] if trial_record else None, trial_record]
-            writer.writerow(data_row)
+            except Exception as e:
+                error_log_path = f"output/{folder_name}/errors.txt"
+                with open(error_log_path, "a") as f:
+                    f.write(f"Trial {trial} (Attempt {retry+1}) failed: {str(e)}\n")
+                retry += 1
 
 
 
@@ -1787,8 +1807,8 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 ## Run PDDL generation models
 i = 0
 num_trials = 5
-# run_iterative_model("o3-mini-2025-01-31", 1, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
-run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+run_iterative_model("o3-mini-2025-01-31", 1, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
