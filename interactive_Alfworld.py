@@ -795,6 +795,7 @@ if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
 problem = os.path.dirname(problems[9]) # select a specific problem to test
+game_type = 'cool' # set game_type here!
 print(f"Playing {problem}")
 
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
@@ -1162,100 +1163,100 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
 
 # Set up baseline model: get actions directly from model
 def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None, goal_type="detailed"):
-    prompt_general = f"""
-        You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
-        Your task is to interact with objects and receptacles to complete a goal step by step.
+    # prompt_general = f"""
+    #     You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
+    #     Your task is to interact with objects and receptacles to complete a goal step by step.
 
-        Your specific task goal: {goal if goal else "Explore and interact meaningfully based on available observations."}
+    #     Your specific task goal: {goal if goal else "Explore and interact meaningfully based on available observations."}
 
-        Here are your current observations: {brief_obs}
+    #     Here are your current observations: {brief_obs}
 
-        Valid actions you can take (follow exactly this format, replacing the parts in brackets with actual object and location names. Do not include any brackets in your output):
-            - go to [towelholder 1]
-            - open [cabinet 2]
-            - take [cloth 1] from [cabinet 3]
-            - move [soap bar 1] to [sink basin 2]
-            - use [desk lamp 1]
-            - heat [bread 1] with [microwave 1]
-            - clean [fork 1] with [sink basin 1]
-            - cool [wine bottle 1] with [fridge 1]
-            - slice [bread 1] with [knife 1]
-        Only replace the object and receptacle names (the words that were inside the brackets) with the actual values from the game environment. Do not change the structure. Do not include brackets.
+    #     Valid actions you can take (follow exactly this format, replacing the parts in brackets with actual object and location names. Do not include any brackets in your output):
+    #         - go to [towelholder 1]
+    #         - open [cabinet 2]
+    #         - take [cloth 1] from [cabinet 3]
+    #         - move [soap bar 1] to [sink basin 2]
+    #         - use [desk lamp 1]
+    #         - heat [bread 1] with [microwave 1]
+    #         - clean [fork 1] with [sink basin 1]
+    #         - cool [wine bottle 1] with [fridge 1]
+    #         - slice [bread 1] with [knife 1]
+    #     Only replace the object and receptacle names (the words that were inside the brackets) with the actual values from the game environment. Do not change the structure. Do not include brackets.
 
-        Your actions should exactly follow this phrasing — do not invent new formats. Every action must correspond to a valid command from the environment.
+    #     Your actions should exactly follow this phrasing — do not invent new formats. Every action must correspond to a valid command from the environment.
 
-        You are in an unfamiliar environment. Your task is to complete the given objective by observing your surroundings and interacting with objects and receptacles.
-        You must build and update PDDL files solely based on what you directly observe. Do not make assumptions.
+    #     You are in an unfamiliar environment. Your task is to complete the given objective by observing your surroundings and interacting with objects and receptacles.
+    #     You must build and update PDDL files solely based on what you directly observe. Do not make assumptions.
 
-        General Goal: Find the necessary object(s) and use them appropriately to accomplish the task.
-        Use the allowed actions to explore, discover, and act purposefully. Plan each step based on what you know so far.
+    #     General Goal: Find the necessary object(s) and use them appropriately to accomplish the task.
+    #     Use the allowed actions to explore, discover, and act purposefully. Plan each step based on what you know so far.
         
-        Constraints:
-            1. Do not assume unseen objects or relationships.
-            2. Receptacle names must be preserved exactly.
-            3. Do not proceed to Stage 2 before completing Stage 1.
+    #     Constraints:
+    #         1. Do not assume unseen objects or relationships.
+    #         2. Receptacle names must be preserved exactly.
+    #         3. Do not proceed to Stage 2 before completing Stage 1.
         
-        Memory of past steps:
-        {overall_memory if overall_memory else "No additional memory available."}
+    #     Memory of past steps:
+    #     {overall_memory if overall_memory else "No additional memory available."}
 
-        If there are errors or obstacles, here is the message:
-        {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
+    #     If there are errors or obstacles, here is the message:
+    #     {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
 
-        Provide the output in strict JSON format like this:
-        {{
-            "actions": ["action1", "action2", ...]
-        }}
-    """
+    #     Provide the output in strict JSON format like this:
+    #     {{
+    #         "actions": ["action1", "action2", ...]
+    #     }}
+    # """
 
-    prompt_subgoal = f"""
-        You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
-        Your task is to interact with objects and receptacles to complete a goal step by step.
+    # prompt_subgoal = f"""
+    #     You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
+    #     Your task is to interact with objects and receptacles to complete a goal step by step.
 
-        Your specific task goal: {goal if goal else "Explore and interact meaningfully based on available observations."}
+    #     Your specific task goal: {goal if goal else "Explore and interact meaningfully based on available observations."}
 
-        Here are your current observations: {brief_obs}
+    #     Here are your current observations: {brief_obs}
 
-        Valid actions you can take (follow exactly this format, replacing the parts in brackets with actual object and location names. Do not include any brackets in your output):
-            - go to [towelholder 1]
-            - open [cabinet 2]
-            - take [cloth 1] from [cabinet 3]
-            - move [soap bar 1] to [sink basin 2]
-            - use [desk lamp 1]
-            - heat [bread 1] with [microwave 1]
-            - clean [fork 1] with [sink basin 1]
-            - cool [wine bottle 1] with [fridge 1]
-            - slice [bread 1] with [knife 1]
-        Only replace the object and receptacle names (the words that were inside the brackets) with the actual values from the game environment. Do not change the structure. Do not include brackets.
+    #     Valid actions you can take (follow exactly this format, replacing the parts in brackets with actual object and location names. Do not include any brackets in your output):
+    #         - go to [towelholder 1]
+    #         - open [cabinet 2]
+    #         - take [cloth 1] from [cabinet 3]
+    #         - move [soap bar 1] to [sink basin 2]
+    #         - use [desk lamp 1]
+    #         - heat [bread 1] with [microwave 1]
+    #         - clean [fork 1] with [sink basin 1]
+    #         - cool [wine bottle 1] with [fridge 1]
+    #         - slice [bread 1] with [knife 1]
+    #     Only replace the object and receptacle names (the words that were inside the brackets) with the actual values from the game environment. Do not change the structure. Do not include brackets.
 
-        Your actions should exactly follow this phrasing — do not invent new formats. Every action must correspond to a valid command from the environment.
+    #     Your actions should exactly follow this phrasing — do not invent new formats. Every action must correspond to a valid command from the environment.
 
-        Your process involves two main stages with the following subgoals:
+    #     Your process involves two main stages with the following subgoals:
 
-        Stage 1: Search for the Target Object
-            Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
-            Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
+    #     Stage 1: Search for the Target Object
+    #         Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
+    #         Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
 
-        Stage 2: Use the Object to Complete the Task
-            Goal 2.1: Pick up the target object using the PickupObject action.
-            Goal 2.2: Move to the appropriate location needed to fulfill the task.
-            Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
+    #     Stage 2: Use the Object to Complete the Task
+    #         Goal 2.1: Pick up the target object using the PickupObject action.
+    #         Goal 2.2: Move to the appropriate location needed to fulfill the task.
+    #         Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
 
-        Constraints:
-            1. Do not assume unseen objects or relationships.
-            2. Receptacle names must be preserved exactly.
-            3. Do not proceed to Stage 2 before completing Stage 1.
+    #     Constraints:
+    #         1. Do not assume unseen objects or relationships.
+    #         2. Receptacle names must be preserved exactly.
+    #         3. Do not proceed to Stage 2 before completing Stage 1.
 
-        Memory of past steps:
-        {overall_memory if overall_memory else "No additional memory available."}
+    #     Memory of past steps:
+    #     {overall_memory if overall_memory else "No additional memory available."}
 
-        If there are errors or obstacles, here is the message:
-        {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
+    #     If there are errors or obstacles, here is the message:
+    #     {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
 
-        Provide the output in strict JSON format like this:
-        {{
-            "actions": ["action1", "action2", ...]
-        }}
-    """
+    #     Provide the output in strict JSON format like this:
+    #     {{
+    #         "actions": ["action1", "action2", ...]
+    #     }}
+    # """
 
     prompt_detailed = f"""
         You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
@@ -1288,18 +1289,6 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
 
             You can only use the GotoLocation action to travel to a new location and the OpenObject action (if the receptacle is closed) to verify whether it contains the target object.
 
-            Goal 1.1: Reach a location that has not been visited (the location should be a receptacle) using the GotoLocation action. 
-                You goal should look like this:
-                (:goal 
-                    (at ?recepatacle)
-                ) where recepatacle should be somewhere or some recepatacles not visited.
-
-            Goal 1.2: If you already go to the recepatacle and found the recepatacle is closed, use the OpenObject action to open it and inspect the contents. 
-                Your goal should look like this:
-                (:goal 
-                    (opened ?recepatacle)
-                ) where recepatacle should be the recepatacle you want to open.
-
         2. Using the Object to Complete the Task:
             Once you have located and picked up the object, update your goal to focus on how the object is used to complete the task. This may involve more than simply transferring it from one place to another.
             For example: You might examine the object or a nearby receptacle to gather information. You may need to use another tool or device (like a lamp or a switch). Some tasks require you to slice, heat, cool, or clean the object using an appropriate receptacle (e.g., microwave, sink, fridge).
@@ -1330,15 +1319,16 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
     """
     if goal_type == 'detailed':
         prompt = prompt_detailed
-    elif goal_type == 'subgoal':
-        prompt = prompt_subgoal
-    else:
-        prompt = prompt_general
+    # elif goal_type == 'subgoal':
+    #     prompt = prompt_subgoal
+    # else:
+    #     prompt = prompt_general
 
     actions = run_gpt_for_actions_baseline(prompt, model_name)
     return actions
 
-# Main functions here:
+
+# ===== Main functions here =====
 def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial = 0, end_trial = 11, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
     # trial_record = 
     # structured_info_record = "output/summary"
@@ -1613,7 +1603,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 
                 with open(f"output/{result_name}.csv", "a", newline="") as csvfile: 
                     # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
-                    game_type = 'cool' # heat, clean, cool, slice, basic
+                    # game_type = 'cool' # heat, clean, cool, slice, basic
                     model_type = 'PDDL' # baseline
                     # prompt_type = 'detailed' # detailed, subgoal
                     data_row = [today, model_name, model_type, game_type, goal_type, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
@@ -1746,22 +1736,35 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                     f.write("Success! Task completed.\n")
                                 break
 
+                            taken_action = act
                             if "Nothing happens." in brief_obs:
-                                if "open" in act:
-                                    large_loop_error_message = f"""This is the action you take: {act}. You are trying to open a receptacle but nothing happens. 
-                                            You should first go to this receptacle to open it. If you already did, and still see this message, it means this receptacle cannot be opened."""
-                                elif "take" in act:
-                                    large_loop_error_message = f"""This is the action you take: {act}. You are trying to take something that does not exist. 
-                                            Explore more receptacles and make sure the object exists."""
-                                elif "move" in act:
-                                    large_loop_error_message = f"""This is the action you take: {act}. You tried to move an object but failed. 
-                                            Ensure you have the object in inventory before placing it."""
-                                elif "slice" in act:
-                                    large_loop_error_message = f"""This is the action you take: {act}. You are trying to slice an object without the proper tool. 
-                                            You need to pick up the sharp object first."""
-                                elif "cool" in act:
-                                    large_loop_error_message = f"""This is the action you take: {act}. You are trying to cool an object with a fridge. 
-                                            You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
+                                if "go to" in taken_action:
+                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to go to a receptacle but nothing happens. 
+                                    You may already been at this receptacle, in other words, you have already went to this place and do not need to go to this receptacle again.
+                                    Otherwise, there is no the receptacle you are aiming to."""
+                                    continue
+                                elif "open" in taken_action:
+                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to open a receptacle but nothing happens. 
+                                    You should first go to this receptacle to open it. 
+                                    But if you have already go to this receptacle and still seeing this error message, it means that this receptacle cannot be opened and you can directly see objects after you go to it. Do not try to open it!!"""
+                                elif "take" in taken_action:
+                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to take something not existed from that receptacle.
+                                    You should go to other receptacle to find your aim object. Remember do not assume you can take the object from the receptable but should always set the initial goal as finding that aim object."""
+                                elif "move" in taken_action:
+                                    large_loop_error_message = f"""This is the action you take: {taken_action}.
+                                    You want to move some object to a receptacle but failed. You should first find that object somewhere by going to an unvisited receptacle and open if necessary.
+                                    Then pick up the aiming object so that you can go to your aim receptacle and put it there.
+                                    """
+                                elif "slice" in taken_action:
+                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to slice an object with a sharp object.
+                                    You should first pickup the sharp object then take the slice action"""
+                                elif "cool" in taken_action:
+                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to cool an object with a fridge. 
+                                    You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
+                                elif "fridge" in taken_action and ("move" in taken_action or "take" in taken_action): # pass this
+                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to move or take an object to or from a fridge. 
+                                    You don't need to take this action! You should go to fridge receptacle, cool the object, go to another receptacle"""
+                                    continue
                                 break
 
                         if action_passed:
@@ -1777,9 +1780,9 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
                 with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
                     writer = csv.writer(csvfile)
-                    game_type = 'cool' # heat, clean, cool, slice, basic
+                    # game_type = 'cool' # heat, clean, cool, slice, basic
                     model_type = 'baseline' # baseline, PDDL
-                    # prompt_type = 'detailed' # detailed, subgoal
+                    # goal_type = 'detailed' # In baseline, only use detailed goal_type
                     data_row = [today, model_name, model_type, game_type, goal_type, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
 
                     # data_row = [today, model_name, trial, succeed, len(trial_record)-1 if trial_record else -1, trial_record[-1] if trial_record else None, trial_record]
@@ -1798,6 +1801,11 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 ## Run baseline models
+i = 0
+num_trials = 5
+run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
+
+run_baseline_alfworld("gpt-4o-mini-2024-07-18", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
 # run_baseline_alfworld("gpt-4o-mini-2024-07-18", 0, 2)
 # run_baseline_alfworld("o3-mini-2025-01-31", 4, 6, folder_name="10_040825_alfworld_baseline_detailed", result_name="alfworld_baseline_detailed", goal_type="detailed")
 # run_baseline_alfworld("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 3, 10) # models--google--gemma-2-27b-it
@@ -1805,9 +1813,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 ## Run PDDL generation models
-i = 0
-num_trials = 5
-run_iterative_model("o3-mini-2025-01-31", 1, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
 
