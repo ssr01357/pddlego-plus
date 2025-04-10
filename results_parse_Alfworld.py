@@ -3,7 +3,7 @@ import ast
 
 # Read CSV data
 df = pd.read_csv("output/alfworld_detailed_results.csv", header=None, 
-                 names=["date", "model", "model_type", "game_type", "prompt_type", "game_id", "succeed", 
+                 names=["date", "model", "model_type", "game_type", "goal_type", "game_id", "succeed", 
                         "final_step_index", "last_attempt_str", "steps_str"])
 
 # Convert succeed column to Boolean
@@ -61,12 +61,12 @@ metrics = df.apply(analyze_game, axis=1)
 metrics_df = pd.DataFrame(metrics.tolist())
 
 # Combine metrics with identifiers (include model_type now)
-df_metrics = pd.concat([df[["model_type", "model", "game_type", "prompt_type"]], metrics_df], axis=1)
+df_metrics = pd.concat([df[["model_type", "model", "game_type", "goal_type"]], metrics_df], axis=1)
 
 # === Flexible group key setup ===
 # You can modify this as needed:
-# group_keys = ["model_type", "model", "prompt_type"]
-group_keys = ["model_type", "model", "game_type", "prompt_type"]  # for more granularity
+# group_keys = ["model_type", "model", "goal_type"]
+group_keys = ["model_type", "model", "game_type", "goal_type"]  # for more granularity
 
 # Filter successes and failures
 df_success = df_metrics[df_metrics["succeed"] == 1]
