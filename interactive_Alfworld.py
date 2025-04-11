@@ -119,7 +119,7 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         client = OpenAI(api_key=deepseekAPI, base_url="https://api.deepseek.com")
 
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-reasoner",
             messages=[
                 {"role": "system", "content": "You are generating PDDL according to your observations."},
                 {"role": "user", "content": prompt},
@@ -794,8 +794,11 @@ problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
-problem = os.path.dirname(problems[9]) # select a specific problem to test
-game_type = 'cool' # set game_type here!
+problem_id = 6
+problem = os.path.dirname(problems[problem_id]) # select a specific problem to test
+problem_type_dic = {1: 'basic', 3:'slice & heat', 5:'use', 6:'clean', 9:'cool'}
+game_type = problem_type_dic[problem_id] # set game_type here!
+
 print(f"Playing {problem}")
 
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
@@ -1161,7 +1164,6 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     return df, pf, err, prompt
 
 
-# Set up baseline model: get actions directly from model
 def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None, goal_type="detailed"):
     # prompt_general = f"""
     #     You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
@@ -1326,6 +1328,7 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
 
     actions = run_gpt_for_actions_baseline(prompt, model_name)
     return actions
+
 
 
 # ===== Main functions here =====
@@ -1805,7 +1808,7 @@ i = 0
 num_trials = 5
 run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
 
-run_baseline_alfworld("gpt-4o-mini-2024-07-18", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
+# run_baseline_alfworld("gpt-4o-mini-2024-07-18", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
 # run_baseline_alfworld("gpt-4o-mini-2024-07-18", 0, 2)
 # run_baseline_alfworld("o3-mini-2025-01-31", 4, 6, folder_name="10_040825_alfworld_baseline_detailed", result_name="alfworld_baseline_detailed", goal_type="detailed")
 # run_baseline_alfworld("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 3, 10) # models--google--gemma-2-27b-it
@@ -1813,7 +1816,7 @@ run_baseline_alfworld("gpt-4o-mini-2024-07-18", i, i+num_trials, folder_name="11
 
 
 ## Run PDDL generation models
-run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
+# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
 

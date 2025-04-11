@@ -202,7 +202,7 @@ print(valid_actions)
 
 # cabinets = [f'cabinet {i}' for i in range(1,22)]
 
-# == Problem 1 ==
+# == Problem 1 == Done
 # 'open shelf 1', 'examine shelf 1', 'open shelf 1', 'take cloth 1 from cabinet 4', 'go to bathtubbasin 1', 'examine bathtubbasin 1', 'move cloth 1 to bathtubbasin 1']
 
 # == Problem 3 ==
@@ -215,7 +215,7 @@ print(valid_actions)
 # == Problem 6: clean some fork and put it in countertop. ==
 actions = ['go to diningtable 1', 'take fork 1 from diningtable 1', 'go to sinkbasin 1', 'clean fork 1 with sinkbasin 1', 'go to countertop 1', 'move fork 1 to countertop 1']
 
-# == Problem 9: cool some winebottle and put it in diningtable. ==
+# == Problem 9: cool some winebottle and put it in diningtable. == DOne
 # actions = ['go to diningtable 1', 'take winebottle 1 from diningtable 1', 'go to fridge 1', '(open fridge 1)', 'cool winebottle 1 with fridge 1', 'go to diningtable 1', 'move winebottle 1 to diningtable 1']
 # actions = ['go to diningtable 1', 'take winebottle 1 from diningtable 1', 'go to fridge 1', 'move winebottle 1 to fridge 1 (Nothing happens.)', 'cool winebottle 1 with fridge 1','take winebottle 1 from fridge 1 (Nothing happens.)', 'go to diningtable 1', 'move winebottle 1 to diningtable 1']
 
