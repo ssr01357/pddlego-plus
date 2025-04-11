@@ -83,7 +83,7 @@ def get_action_from_pddl(df, pf):
 
 # LLM set up
 close_source_model_lists = ['o3-mini', 'gpt-4o', 'gpt-4o-2024-05-13', 'o3-mini-2025-01-31']
-def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"):
+def run_llm_model(prompt, model_name):
 
     if model_name in close_source_model_lists: # closed source LLMs
         client = OpenAI()
@@ -255,7 +255,7 @@ def run_gpt_for_actions_baseline(prompt, model_name):
 
         return actions
     elif model_name == 'deepseek':
-        deepseekAPI = os.getenv("deepseek_API")
+        deepseekAPI = os.getenv("deepseek-reasoner")
         client = OpenAI(api_key=deepseekAPI, base_url="https://api.deepseek.com")
 
         response = client.chat.completions.create(
@@ -1327,7 +1327,7 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
     #     prompt = prompt_general
 
     actions = run_gpt_for_actions_baseline(prompt, model_name)
-    return actions
+    return actions, prompt
 
 
 
@@ -1701,7 +1701,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                             for act in successful_actions:
                                 obs, _, _, infos = env.step(act)
 
-                        actions = llm_to_actions_baseline(
+                        actions, prompt = llm_to_actions_baseline(
                             model_name,
                             brief_obs,
                             valid_actions,
@@ -1711,6 +1711,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         )
 
                         with open(file_name, "a") as f:
+                            f.write(f"Prompt: {prompt}\n")
                             f.write(f"Generated Actions: {actions}\n")
 
                         if not actions:
