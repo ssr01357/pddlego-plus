@@ -794,9 +794,11 @@ problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
-problem_id = 3
+problem_id = 5
 problem = os.path.dirname(problems[problem_id]) # select a specific problem to test
-problem_type_dic = {1: 'basic', 3:'slice & heat', 5:'use', 6:'clean', 9:'cool'}
+# problem_type_dic = {1: 'basic', 3:'slice & heat', 5:'use', 6:'clean', 9:'cool'}
+problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
+     5:'use', 6:'clean', 7: 'use', 8: 'basic' 9:'cool'}
 game_type = problem_type_dic[problem_id] # set game_type here!
 
 print(f"Playing {problem}")
@@ -1049,7 +1051,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             :parameters (?o - object ?r - fridgeReceptacle)
         10. slice an object using a sharp object
             :action SliceObject
-            :parameters (?r - receptacle ?co - object ?sharp_o - object)
+            :parameters (?r - receptacle ?co - object ?sharp_o - sharpObject)
 
         You must go to a receptacle first in order to use/open it or take/put objects from/on it.
 
@@ -1080,8 +1082,10 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             If necessary, use the PickupObject action to retrieve the item, and the GotoLocation action to move to the correct place.
             Then, apply the object in a purposeful way — not just move it — but interact with the environment to fulfill the task’s actual goal.
 
-            Hint: if you want to heat, clean, and cool an object, after you go to that aim receptacle, do not put the object in the receptacle but do the action directly. For example, go to fridge, then cool the object with receptacle.
-                But if you want to slice an object, you should first go to the receptacle and pick up the sharp object then do the slice action.
+            Hint: 
+            1. If you want to heat, clean, and cool an object, after you go to that aim receptacle, do not put the object in the receptacle but do the action directly. For example, go to fridge, then cool the object with receptacle.
+            2. If you want to slice an object, you should first go to the receptacle where both the sharp object and the aim object are located and ONLY pick up the sharp object then do the slice action. Don't forget to put the sharp object back to the receptacle after you finish slicing.
+            3. If there are multiple actions needed to complete the task, you can break them down into smaller subgoals. For example, if you need to slice and then heat an object, first focus on slicing it, and then move on to heating it.
 
         In summary, the first stage is all about finding the object—this might involve going to an unvisited receptacle and opening it if necessary.
         
@@ -1552,38 +1556,44 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
                             obs_queue.append(brief_obs)
                             with open(file_name, "a") as f:
-                                f.write(f"> {taken_action} \n {brief_obs} \n")
+                                f.write(f"> {brief_obs} \n")
                                 f.write(f"After taking action '{taken_action}', you have the following valid actions: {infos['admissible_commands']} \n")
 
 
                             if "Nothing happens." in brief_obs:
+                                large_loop_error_message = f"""In this step, you take the following actions and observations from those actions:
+                                {''.join(obs_queue)}"""
                                 if "go to" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to go to a receptacle but nothing happens. 
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to go to a receptacle but nothing happens. 
                                     You may already been at this receptacle, in other words, you have already went to this place and do not need to go to this receptacle again.
                                     Otherwise, there is no the receptacle you are aiming to."""
                                     continue
                                 elif "open" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to open a receptacle but nothing happens. 
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to open a receptacle but nothing happens. 
                                     You should first go to this receptacle to open it. 
                                     But if you have already go to this receptacle and still seeing this error message, it means that this receptacle cannot be opened and you can directly see objects after you go to it. Do not try to open it!!"""
                                 elif "take" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to take something not existed from that receptacle.
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to take something from a receptacle.
+                                    You should first go to this receptacle to take the object.
+                                    But if you have already go to this receptacle and still seeing this error message, it means that this receptacle doesn't have this object.
                                     You should go to other receptacle to find your aim object. Remember do not assume you can take the object from the receptable but should always set the initial goal as finding that aim object."""
                                 elif "move" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}.
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}.
                                     You want to move some object to a receptacle but failed. You should first find that object somewhere by going to an unvisited receptacle and open if necessary.
                                     Then pick up the aiming object so that you can go to your aim receptacle and put it there.
                                     """
                                 elif "slice" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to slice an object with a sharp object.
-                                    You should first pickup the sharp object then take the slice action"""
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to slice an object with a sharp object.
+                                    You should first pickup the sharp object (this should be the only object you pick up) then take the slice action directly without picking up the aim object!
+                                    Don't forget to put the sharp object back to the receptacle after you finish slicing."""
                                 elif "cool" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to cool an object with a fridge. 
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to cool an object with a fridge. 
                                     You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
-                                elif "fridge" in taken_action and ("move" in taken_action or "take" in taken_action): # pass this
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to move or take an object to or from a fridge. 
+                                elif ("fridge" in taken_action or "sinkbasin" in taken_action or "microwave" in taken_action) and ("move" in taken_action or "take" in taken_action): # pass this
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to move or take an object to or from a fridge. 
                                     You don't need to take this action! You should go to fridge receptacle, cool the object, go to another receptacle"""
                                     continue
+
                                 break
 
                             # append into overall memory and dictionary format
@@ -1809,7 +1819,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 ## Run baseline models
-i = 0
+i = 2
 num_trials = 5
 folder_name = "11_0410_Alfworld"
 result_name = folder_name
@@ -1823,9 +1833,9 @@ result_name = folder_name
 
 
 ## Run PDDL generation models
-# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
