@@ -1357,7 +1357,31 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
                 trial_record = []
                 
-                # each trial reset environment
+                # each trial reset environment ===================
+                problem_id = random.randint(0, 9)
+                problem = os.path.dirname(problems[problem_id])
+                problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
+                    5:'use', 6:'clean', 7: 'use', 8: 'basic' 9:'cool'}
+                game_type = problem_type_dic[problem_id] # set game_type here!
+                print(f"Playing {problem_id}: {problem}")
+                domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
+                grammar = pjoin(ALFWORLD_DATA, "logic", "alfred.twl2")
+                GAME_LOGIC = {
+                        "pddl_domain": open(domain).read(),
+                        "grammar": open(grammar).read(),
+                    }
+                pddl_file = os.path.join(problem, 'initial_state.pddl')
+                json_file = os.path.join(problem, 'traj_data.json')
+                with open(json_file, 'r') as f:
+                    traj_data = json.load(f)
+                GAME_LOGIC['grammar'] = add_task_to_grammar(GAME_LOGIC['grammar'], traj_data)
+                gamedata = dict(**GAME_LOGIC, pddl_problem=open(pddl_file).read())
+                gamefile = os.path.join(os.path.dirname(pddl_file), 'game.tw-pddl')
+                json.dump(gamedata, open(gamefile, "w"))
+
+                # expert = AlfredExpert(expert_type=AlfredExpertType.PLANNER)
+                expert = AlfredExpert(expert_type=AlfredExpertType.HANDCODED)
+
                 request_infos = textworld.EnvInfos(
                     won=True,
                     admissible_commands=True,
@@ -1381,7 +1405,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 valid_actions = infos["admissible_commands"]
 
                 with open(file_name, "a") as f:  # "w" creates a new file or overwrites an existing file
-                    f.write(f"Playing {problem} \n")
+                    f.write(f"Playing {problem_id}: {problem} \n")
                     f.write(f"Observations: {init_obs} \n") 
                     # f.write(f"Gold path: {env.getGoldActionSequence()} \n")
                     f.write(f"Valid Actions: {valid_actions} \n")
