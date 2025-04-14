@@ -142,7 +142,7 @@ problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
-problem = os.path.dirname(problems[6]) # select a specific problem to test
+problem = os.path.dirname(problems[3]) # select a specific problem to test
 print(f"Playing {problem}")
 
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
@@ -206,14 +206,14 @@ print(valid_actions)
 # 'open shelf 1', 'examine shelf 1', 'open shelf 1', 'take cloth 1 from cabinet 4', 'go to bathtubbasin 1', 'examine bathtubbasin 1', 'move cloth 1 to bathtubbasin 1']
 
 # == Problem 3 ==
-# actions = ['go to countertop 1', 'take knife 1 from countertop 1', 'slice bread 1 with knife 1', 'move knife 1 to countertop 1', 'take bread 1 from countertop 1', \
-#            'go to microwave 1', 'open microwave 1', 'heat bread 1 with microwave 1', 'move bread 1 to microwave 1', 'take bread 1 from microwave 1', 'go to fridge 1','open fridge 1', 'move bread 1 to fridge 1']
+actions = ['go to countertop 1', 'take knife 1 from countertop 1', 'slice bread 1 with knife 1', 'move knife 1 to countertop 1', 'take bread 1 from countertop 1', \
+           'go to microwave 1', 'open microwave 1', 'heat bread 1 with microwave 1', '(move bread 1 to microwave 1)', '(take bread 1 from microwave 1)', 'go to fridge 1','open fridge 1', 'move bread 1 to fridge 1']
 
 # == Problem 5: examine the alarmclock with the desklamp. ==
 # actions = ['go to desk 1', 'take alarmclock 2 from desk 1', 'use desklamp 1']
 
 # == Problem 6: clean some fork and put it in countertop. ==
-actions = ['go to diningtable 1', 'take fork 1 from diningtable 1', 'go to sinkbasin 1', 'clean fork 1 with sinkbasin 1', 'go to countertop 1', 'move fork 1 to countertop 1']
+# actions = ['go to diningtable 1', 'take fork 1 from diningtable 1', 'go to sinkbasin 1', 'clean fork 1 with sinkbasin 1', 'go to countertop 1', 'move fork 1 to countertop 1']
 
 # == Problem 9: cool some winebottle and put it in diningtable. == DOne
 # actions = ['go to diningtable 1', 'take winebottle 1 from diningtable 1', 'go to fridge 1', '(open fridge 1)', 'cool winebottle 1 with fridge 1', 'go to diningtable 1', 'move winebottle 1 to diningtable 1']

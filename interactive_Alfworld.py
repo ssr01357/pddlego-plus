@@ -794,7 +794,7 @@ problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
-problem_id = 6
+problem_id = 3
 problem = os.path.dirname(problems[problem_id]) # select a specific problem to test
 problem_type_dic = {1: 'basic', 3:'slice & heat', 5:'use', 6:'clean', 9:'cool'}
 game_type = problem_type_dic[problem_id] # set game_type here!
@@ -1043,7 +1043,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             :parameters (?o - object ?r - microwaveReceptacle)
         8. clean an object using a receptacle
             :action CleanObject
-            :parameters (?o - object ?r - receptacle)
+            :parameters (?o - object ?r - sinkbasinReceptacle)
         9. cool an object using a receptacle
             :action CoolObject
             :parameters (?o - object ?r - fridgeReceptacle)
@@ -1632,7 +1632,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 fixed_model_name = model_name.replace("/", "_")
                 folder_path = f"output/{folder_name}"
                 os.makedirs(folder_path, exist_ok=True)
-                file_name = f"{folder_path}/{today}_{fixed_model_name}_{trial}.txt"
+                file_name = f"{folder_path}/{today}_{fixed_model_name}_baseline_{trial}.txt"
 
                 if retry == 1 and os.path.exists(file_name):
                     open(file_name, 'w').close()  # empty file
@@ -1765,10 +1765,14 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                 elif "cool" in taken_action:
                                     large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to cool an object with a fridge. 
                                     You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
-                                elif "fridge" in taken_action and ("move" in taken_action or "take" in taken_action): # pass this
+                                elif ("fridge" in taken_action or "sinkbasin" in taken_action or "microwave" in taken_action) and ("move" in taken_action or "take" in taken_action): # pass this
                                     large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to move or take an object to or from a fridge. 
                                     You don't need to take this action! You should go to fridge receptacle, cool the object, go to another receptacle"""
                                     continue
+                                elif "slice" in taken_action:
+                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to slice an object with another sharp object. 
+                                    You should first pickup the sharp and notice that this should be the only object you pickup. Then take the slice action. 
+                                    Don't forget to move the sharp object to the receptacle after you slice the object and take the sliced object from the receptacle."""
                                 break
 
                         if action_passed:
@@ -1807,7 +1811,9 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 ## Run baseline models
 i = 0
 num_trials = 5
-run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
+folder_name = "11_0410_Alfworld"
+result_name = folder_name
+# run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
 
 # run_baseline_alfworld("gpt-4o-mini-2024-07-18", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
 # run_baseline_alfworld("gpt-4o-mini-2024-07-18", 0, 2)
@@ -1817,9 +1823,9 @@ run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name="11_041
 
 
 ## Run PDDL generation models
-# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
-# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
-# run_iterative_model("deepseek", i, i+num_trials, folder_name="08_031825_alfworld", result_name="alfworld_detailed_results", goal_type="detailed")
+# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
