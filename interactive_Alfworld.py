@@ -798,7 +798,7 @@ problem_id = 5
 problem = os.path.dirname(problems[problem_id]) # select a specific problem to test
 # problem_type_dic = {1: 'basic', 3:'slice & heat', 5:'use', 6:'clean', 9:'cool'}
 problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
-     5:'use', 6:'clean', 7: 'use', 8: 'basic' 9:'cool'}
+     5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}
 game_type = problem_type_dic[problem_id] # set game_type here!
 
 print(f"Playing {problem}")
@@ -1021,7 +1021,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         Now, {goal}
         Here are your current observations: {brief_obs}
 
-        The following actions are allowed: 
+        Only the following actions are allowed: 
         1. go to a receptacle
             :action GotoLocation
             :parameters (?from - receptacle ?to - receptacle)
@@ -1085,7 +1085,8 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             Hint: 
             1. If you want to heat, clean, and cool an object, after you go to that aim receptacle, do not put the object in the receptacle but do the action directly. For example, go to fridge, then cool the object with receptacle.
             2. If you want to slice an object, you should first go to the receptacle where both the sharp object and the aim object are located and ONLY pick up the sharp object then do the slice action. Don't forget to put the sharp object back to the receptacle after you finish slicing.
-            3. If there are multiple actions needed to complete the task, you can break them down into smaller subgoals. For example, if you need to slice and then heat an object, first focus on slicing it, and then move on to heating it.
+            3. If you want to examine or look at an object with a lamp, you should first go to the receptacle where the object is located and then pick it up and take the USE action of the lamp. You don't need to take the lamp but directly use it.
+            4. If there are multiple actions needed to complete the task, you can break them down into smaller subgoals. For example, if you need to slice and then heat an object, first focus on slicing it, and then move on to heating it.
 
         In summary, the first stage is all about finding the object—this might involve going to an unvisited receptacle and opening it if necessary.
         
@@ -1358,29 +1359,27 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 trial_record = []
                 
                 # each trial reset environment ===================
-                problem_id = random.randint(0, 9)
-                problem = os.path.dirname(problems[problem_id])
-                problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
-                    5:'use', 6:'clean', 7: 'use', 8: 'basic' 9:'cool'}
-                game_type = problem_type_dic[problem_id] # set game_type here!
-                print(f"Playing {problem_id}: {problem}")
-                domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
-                grammar = pjoin(ALFWORLD_DATA, "logic", "alfred.twl2")
-                GAME_LOGIC = {
-                        "pddl_domain": open(domain).read(),
-                        "grammar": open(grammar).read(),
-                    }
-                pddl_file = os.path.join(problem, 'initial_state.pddl')
-                json_file = os.path.join(problem, 'traj_data.json')
-                with open(json_file, 'r') as f:
-                    traj_data = json.load(f)
-                GAME_LOGIC['grammar'] = add_task_to_grammar(GAME_LOGIC['grammar'], traj_data)
-                gamedata = dict(**GAME_LOGIC, pddl_problem=open(pddl_file).read())
-                gamefile = os.path.join(os.path.dirname(pddl_file), 'game.tw-pddl')
-                json.dump(gamedata, open(gamefile, "w"))
-
-                # expert = AlfredExpert(expert_type=AlfredExpertType.PLANNER)
-                expert = AlfredExpert(expert_type=AlfredExpertType.HANDCODED)
+                # problem_id = random.randint(0, 9)
+                # problem = os.path.dirname(problems[problem_id])
+                # problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
+                #     5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}
+                # game_type = problem_type_dic[problem_id] # set game_type here!
+                # print(f"Playing {problem_id}: {problem}")
+                # domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
+                # grammar = pjoin(ALFWORLD_DATA, "logic", "alfred.twl2")
+                # GAME_LOGIC = {
+                #         "pddl_domain": open(domain).read(),
+                #         "grammar": open(grammar).read(),
+                #     }
+                # pddl_file = os.path.join(problem, 'initial_state.pddl')
+                # json_file = os.path.join(problem, 'traj_data.json')
+                # with open(json_file, 'r') as f:
+                #     traj_data = json.load(f)
+                # GAME_LOGIC['grammar'] = add_task_to_grammar(GAME_LOGIC['grammar'], traj_data)
+                # gamedata = dict(**GAME_LOGIC, pddl_problem=open(pddl_file).read())
+                # gamefile = os.path.join(os.path.dirname(pddl_file), 'game.tw-pddl')
+                # json.dump(gamedata, open(gamefile, "w"))
+                # expert = AlfredExpert(expert_type=AlfredExpertType.HANDCODED)
 
                 request_infos = textworld.EnvInfos(
                     won=True,
@@ -1617,6 +1616,9 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                     large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to move or take an object to or from a fridge. 
                                     You don't need to take this action! You should go to fridge receptacle, cool the object, go to another receptacle"""
                                     continue
+                                elif "use" in taken_action:
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to use an object.
+                                    You can only use a lamp to turn it on and look at or examine other objects. Note: to look at or examine other objects, you should first pick it up."""
 
                                 break
 
