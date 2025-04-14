@@ -32,8 +32,6 @@ from alfworld.agents.environment.alfred_tw_env import AlfredExpert, AlfredDemang
 from openai import OpenAI
 print('finishing import')
 
-# client = OpenAI()
-# os.environ["OPENAI_API_KEY"] = ""
 
 # Solver set up
 def run_solver(domain_file, problem_file, solver, max_retries=3):
@@ -793,10 +791,8 @@ problems = glob.glob(pjoin(ALFWORLD_DATA, "**", "initial_state.pddl"), recursive
 problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
-# problem = os.path.dirname(random.choice(problems)) # random select one problem
 problem_id = 5
-problem = os.path.dirname(problems[problem_id]) # select a specific problem to test
-# problem_type_dic = {1: 'basic', 3:'slice & heat', 5:'use', 6:'clean', 9:'cool'}
+problem = os.path.dirname(problems[problem_id])
 problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
      5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}
 game_type = problem_type_dic[problem_id] # set game_type here!
@@ -1406,7 +1402,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 with open(file_name, "a") as f:  # "w" creates a new file or overwrites an existing file
                     f.write(f"Playing {problem_id}: {problem} \n")
                     f.write(f"Observations: {init_obs} \n") 
-                    # f.write(f"Gold path: {env.getGoldActionSequence()} \n")
                     f.write(f"Valid Actions: {valid_actions} \n")
                     f.write(f"taskDescription: {goal} \n")
 
@@ -1421,7 +1416,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 brief_obs = "Action: look around\n" + summarize_obs(init_obs)+'\n' # initial definition
                 with open(file_name, "a") as f:
                     f.write(f"brief_obs: {brief_obs} \n") 
-                # print(brief_obs)
 
                 action_queue = []
                 obs_queue = []
@@ -1451,17 +1445,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
                         within_step_tries += 1
 
-                        if within_step_tries > 1: # second or third ... time in the larger loop
-                            # reset env by refilling successful actions (stupid but useful)
-                            # each trial reset environment
-                            # request_infos = textworld.EnvInfos(
-                            #     won=True,
-                            #     admissible_commands=True,
-                            #     score=True,
-                            #     max_score=True,
-                            #     intermediate_reward=True,
-                            #     extras=["expert_plan"]
-                            # )
+                        if within_step_tries > 1: 
                             env_id = textworld.gym.register_game(
                                 gamefile,
                                 request_infos,
@@ -1472,9 +1456,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
                             # reset environment
                             obs, infos = env.reset()
-                            # init_obs = obs.split('\n')[2]
-                            # goal = obs.split('\n')[-1]
-                            # valid_actions = infos["admissible_commands"]
                             for successful_action in successful_actions:
                                 obs, score, done, infos = env.step(successful_action)
 
@@ -1641,9 +1622,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 
                 with open(f"output/{result_name}.csv", "a", newline="") as csvfile: 
                     # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
-                    # game_type = 'cool' # heat, clean, cool, slice, basic
-                    model_type = 'PDDL' # baseline
-                    # prompt_type = 'detailed' # detailed, subgoal
+                    model_type = 'PDDL'
                     data_row = [today, model_name, model_type, game_type, goal_type, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
                     writer = csv.writer(csvfile)
                     writer.writerow(data_row)
@@ -1673,6 +1652,29 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     open(file_name, 'w').close()  # empty file
                     print(f"[Trial {trial}] Retrying: cleared file and retrying...")
                 trial_record = []
+
+                # each trial reset environment ===================
+                problem_id = random.randint(0, 9)
+                problem = os.path.dirname(problems[problem_id])
+                problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
+                    5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}
+                game_type = problem_type_dic[problem_id] # set game_type here!
+                print(f"Playing {problem_id}: {problem}")
+                domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
+                grammar = pjoin(ALFWORLD_DATA, "logic", "alfred.twl2")
+                GAME_LOGIC = {
+                        "pddl_domain": open(domain).read(),
+                        "grammar": open(grammar).read(),
+                    }
+                pddl_file = os.path.join(problem, 'initial_state.pddl')
+                json_file = os.path.join(problem, 'traj_data.json')
+                with open(json_file, 'r') as f:
+                    traj_data = json.load(f)
+                GAME_LOGIC['grammar'] = add_task_to_grammar(GAME_LOGIC['grammar'], traj_data)
+                gamedata = dict(**GAME_LOGIC, pddl_problem=open(pddl_file).read())
+                gamefile = os.path.join(os.path.dirname(pddl_file), 'game.tw-pddl')
+                json.dump(gamedata, open(gamefile, "w"))
+                expert = AlfredExpert(expert_type=AlfredExpertType.HANDCODED)
 
                 request_infos = textworld.EnvInfos(
                     won=True,
@@ -1827,12 +1829,8 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
                 with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
                     writer = csv.writer(csvfile)
-                    # game_type = 'cool' # heat, clean, cool, slice, basic
-                    model_type = 'baseline' # baseline, PDDL
-                    # goal_type = 'detailed' # In baseline, only use detailed goal_type
+                    model_type = 'baseline' # PDDL
                     data_row = [today, model_name, model_type, game_type, goal_type, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
-
-                    # data_row = [today, model_name, trial, succeed, len(trial_record)-1 if trial_record else -1, trial_record[-1] if trial_record else None, trial_record]
                     writer.writerow(data_row)
 
                 break
