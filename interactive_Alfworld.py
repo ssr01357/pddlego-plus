@@ -1777,37 +1777,41 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
                             taken_action = act
                             if "Nothing happens." in brief_obs:
+                                large_loop_error_message = f"""In this step, you take the following actions and observations from those actions:
+                                    {''.join(obs_queue)}"""
                                 if "go to" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to go to a receptacle but nothing happens. 
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to go to a receptacle but nothing happens. 
                                     You may already been at this receptacle, in other words, you have already went to this place and do not need to go to this receptacle again.
                                     Otherwise, there is no the receptacle you are aiming to."""
                                     continue
                                 elif "open" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to open a receptacle but nothing happens. 
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to open a receptacle but nothing happens. 
                                     You should first go to this receptacle to open it. 
                                     But if you have already go to this receptacle and still seeing this error message, it means that this receptacle cannot be opened and you can directly see objects after you go to it. Do not try to open it!!"""
                                 elif "take" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to take something not existed from that receptacle.
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to take something from a receptacle.
+                                    You should first go to this receptacle to take the object.
+                                    But if you have already go to this receptacle and still seeing this error message, it means that this receptacle doesn't have this object.
                                     You should go to other receptacle to find your aim object. Remember do not assume you can take the object from the receptable but should always set the initial goal as finding that aim object."""
                                 elif "move" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}.
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}.
                                     You want to move some object to a receptacle but failed. You should first find that object somewhere by going to an unvisited receptacle and open if necessary.
                                     Then pick up the aiming object so that you can go to your aim receptacle and put it there.
                                     """
                                 elif "slice" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to slice an object with a sharp object.
-                                    You should first pickup the sharp object then take the slice action"""
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to slice an object with a sharp object.
+                                    You should first pickup the sharp object (this should be the only object you pick up) then take the slice action directly without picking up the aim object!
+                                    Don't forget to put the sharp object back to the receptacle after you finish slicing."""
                                 elif "cool" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to cool an object with a fridge. 
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to cool an object with a fridge. 
                                     You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
                                 elif ("fridge" in taken_action or "sinkbasin" in taken_action or "microwave" in taken_action) and ("move" in taken_action or "take" in taken_action): # pass this
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to move or take an object to or from a fridge. 
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to move or take an object to or from a fridge. 
                                     You don't need to take this action! You should go to fridge receptacle, cool the object, go to another receptacle"""
                                     continue
-                                elif "slice" in taken_action:
-                                    large_loop_error_message = f"""This is the action you take: {taken_action}. You are trying to slice an object with another sharp object. 
-                                    You should first pickup the sharp and notice that this should be the only object you pickup. Then take the slice action. 
-                                    Don't forget to move the sharp object to the receptacle after you slice the object and take the sliced object from the receptacle."""
+                                elif "use" in taken_action:
+                                    large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to use an object.
+                                    You can only use a lamp to turn it on and look at or examine other objects. Note: to look at or examine other objects, you should first pick it up."""
                                 break
 
                         if action_passed:
@@ -1842,32 +1846,21 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 
 
+i = 0
+num_trials = 10
+folder_name = "1_0414_Alfworld"
+result_name = folder_name
 
 ## Run baseline models
-i = 2
-num_trials = 5
-folder_name = "11_0410_Alfworld"
-result_name = folder_name
-# run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
-
-# run_baseline_alfworld("gpt-4o-mini-2024-07-18", i, i+num_trials, folder_name="11_0410_Alfworld", result_name="11_0410_Alfworld", goal_type="detailed")
-# run_baseline_alfworld("gpt-4o-mini-2024-07-18", 0, 2)
-# run_baseline_alfworld("o3-mini-2025-01-31", 4, 6, folder_name="10_040825_alfworld_baseline_detailed", result_name="alfworld_baseline_detailed", goal_type="detailed")
-# run_baseline_alfworld("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 3, 10) # models--google--gemma-2-27b-it
-# run_baseline_alfworld("google/gemma-2-27b-it", 0, 10)
-
+run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## Run PDDL generation models
 run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
-# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
-# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
-# run_iterative_model("deepseek", i, i+num_trials, folder_name="09_040825_alfworld", result_name="alfworld_subgoal_results", goal_type="subgoal")
-
-# run_iterative_model("gpt-4o-2024-05-13", 9, 11)# gpt-4o; o3-mini
-# run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
-
-# run_iterative_model("deepseek", i, i+num_trials) 
-# run_iterative_model("google/gemma-2-27b-it", 6, 10)
+run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")

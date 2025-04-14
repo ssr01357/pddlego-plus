@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import ast
 
 # Read CSV data
@@ -9,6 +10,55 @@ df = pd.read_csv("output/11_0410_Alfworld.csv", header=None,
 # Convert succeed column to Boolean
 df["succeed"] = df["succeed"].astype(str).map({"True": True, "False": False})
 
+# def analyze_game(row):
+#     try:
+#         steps_list = ast.literal_eval(row["steps_str"])
+#     except Exception as e:
+#         print(f"Error parsing steps for row {row.name}: {e}")
+#         return None
+
+#     num_steps = len(steps_list)
+#     solver_errors = 0
+#     solver_fixed = 0
+
+#     for i, step in enumerate(steps_list):
+#         for j, attempt in enumerate(step):
+#             _, small_loop = attempt
+#             if small_loop != 0:
+#                 solver_errors += 1
+#                 if not (i == num_steps - 1 and j == len(step) - 1):
+#                     solver_fixed += 1
+#                 elif small_loop != 5:
+#                     solver_fixed += 1
+
+#     simulation_errors = 0
+#     simulation_fixed = 0
+#     for i, step in enumerate(steps_list):
+#         if len(step) > 1:
+#             simulation_errors += 1
+#             if i != num_steps - 1 or (i == num_steps - 1 and row["succeed"]):
+#                 simulation_fixed += 1
+
+#     final_step = steps_list[-1]
+#     final_attempt = final_step[-1]
+#     _, final_small = final_attempt
+
+#     abort_solver = 1 if (final_small != 0 and final_small == 5) else 0
+#     abort_simulation = 1 if (len(final_step) > 1 and not row["succeed"]) else 0
+
+#     return {
+#         "succeed": 1 if row["succeed"] else 0,
+#         "steps": num_steps,
+#         "solver_errors": solver_errors,
+#         "solver_fixed": solver_fixed,
+#         "simulation_errors": simulation_errors,
+#         "simulation_fixed": simulation_fixed,
+#         "abort_solver": abort_solver,
+#         "abort_simulation": abort_simulation,
+#     }
+
+
+
 def analyze_game(row):
     try:
         steps_list = ast.literal_eval(row["steps_str"])
@@ -17,11 +67,41 @@ def analyze_game(row):
         return None
 
     num_steps = len(steps_list)
+    is_baseline = row["model_type"] == "baseline"
+
+    if is_baseline:
+        # For baseline, no solver-related info available
+        simulation_errors = 0
+        simulation_fixed = 0
+        for i, step in enumerate(steps_list):
+            if len(step) > 1:
+                simulation_errors += 1
+                if i != num_steps - 1 or (i == num_steps - 1 and row["succeed"]):
+                    simulation_fixed += 1
+
+        final_step = steps_list[-1]
+        abort_simulation = 1 if (len(final_step) > 1 and not row["succeed"]) else 0
+
+        return {
+            "succeed": 1 if row["succeed"] else 0,
+            "steps": num_steps,
+            "solver_errors": np.nan,
+            "solver_fixed": np.nan,
+            "simulation_errors": simulation_errors,
+            "simulation_fixed": simulation_fixed,
+            "abort_solver": np.nan,
+            "abort_simulation": abort_simulation,
+        }
+
+    # Else, full model with structured step attempts
     solver_errors = 0
     solver_fixed = 0
 
     for i, step in enumerate(steps_list):
         for j, attempt in enumerate(step):
+            if not isinstance(attempt, (list, tuple)) or len(attempt) != 2:
+                print(f"Unexpected format at row {row.name}, step {i}, attempt {j}: {attempt}")
+                continue
             _, small_loop = attempt
             if small_loop != 0:
                 solver_errors += 1
@@ -40,7 +120,10 @@ def analyze_game(row):
 
     final_step = steps_list[-1]
     final_attempt = final_step[-1]
-    _, final_small = final_attempt
+    if isinstance(final_attempt, (list, tuple)) and len(final_attempt) == 2:
+        _, final_small = final_attempt
+    else:
+        final_small = 0
 
     abort_solver = 1 if (final_small != 0 and final_small == 5) else 0
     abort_simulation = 1 if (len(final_step) > 1 and not row["succeed"]) else 0
