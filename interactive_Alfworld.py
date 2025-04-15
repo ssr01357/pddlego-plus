@@ -164,8 +164,6 @@ def run_llm_model(prompt, model_name):
         # Because Kani calls are async, we need to run them in an event loop
         response_content = asyncio.run(_ask_model(model_name, prompt))
 
-        # deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-        # print(response_content)
         if '</think>' in response_content:
             response_content = response_content[response_content.find('</think>')+10:]
 
@@ -189,10 +187,6 @@ def run_llm_model(prompt, model_name):
             return text
         # print(response_content)
         response_content = extract_json_block(response_content)
-        # print(response_content)
-
-        # # If your model returns a JSON block wrapped in triple backticks, strip them
-        
 
         # Attempt to parse the JSON response
         try:
@@ -253,11 +247,11 @@ def run_gpt_for_actions_baseline(prompt, model_name):
 
         return actions
     elif model_name == 'deepseek':
-        deepseekAPI = os.getenv("deepseek-reasoner")
+        deepseekAPI = os.getenv("deepseek_API")
         client = OpenAI(api_key=deepseekAPI, base_url="https://api.deepseek.com")
 
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-reasoner",
             messages=[
                 {"role": "system", "content": "You are generating PDDL according to your observations."},
                 {"role": "user", "content": prompt},
@@ -273,9 +267,6 @@ def run_gpt_for_actions_baseline(prompt, model_name):
         result = json.loads(response_content)
         df = result.get("df", None)
         pf = result.get("pf", None)
-
-        # if df is None or pf is None:
-        #     raise ValueError("Missing 'df' or 'pf' in the response. Check the prompt or the model output.")
 
         return df, pf
         
@@ -1346,7 +1337,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 folder_path = f"output/{folder_name}"
                 if not os.path.exists(folder_path):
                     os.makedirs(folder_path)
-                file_name = f"{folder_path}/{today}_{fixed_model_name}_{trial}.txt"
+                file_name = f"{folder_path}/{today}_{fixed_model_name}_PDDL_{goal_type}_{trial}.txt"
 
                 if retry == 1 and os.path.exists(file_name):
                     open(file_name, 'w').close()  # empty file
@@ -1850,15 +1841,15 @@ folder_name = "1_0414_Alfworld"
 result_name = folder_name
 
 ## Run baseline models
-run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## Run PDDL generation models
-run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
-run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
