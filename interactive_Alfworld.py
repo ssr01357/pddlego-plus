@@ -1253,7 +1253,7 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
     # """
 
     prompt_detailed = f"""
-        You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
+        You are in an environment that you explore step by step. Based on your observations, generate one valid action at a time to progress in the environment.
         Your task is to interact with objects and receptacles to complete a goal step by step.
 
         Your specific task goal: {goal if goal else "Explore and interact meaningfully based on available observations."}
@@ -1306,9 +1306,9 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
         If there are errors or obstacles, here is the message:
         {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
 
-        Provide the output in strict JSON format like this:
+        Provide the output in strict JSON format like this while you should only generate one action at a time:
         {{
-            "actions": ["action1", "action2", ...]
+            "actions": ["action1"]
         }}
     """
     if goal_type == 'detailed':
@@ -1841,15 +1841,15 @@ folder_name = "1_0414_Alfworld"
 result_name = folder_name
 
 ## Run baseline models
-# run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## Run PDDL generation models
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model("gpt-4o-2024-05-13", 7, 8, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-run_iterative_model("deepseek", 7, 10, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model("deepseek", 7, 10, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
