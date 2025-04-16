@@ -264,11 +264,23 @@ def run_gpt_for_actions_baseline(prompt, model_name):
         if response_content.startswith("```json"):
             response_content = response_content.lstrip("```json").rstrip("```").strip()
 
-        result = json.loads(response_content)
-        df = result.get("df", None)
-        pf = result.get("pf", None)
+        def extract_json_block(text):
+            # This pattern captures everything between ```json and the next ```
+            # (?s) makes '.' match newlines as well
+            pattern = r"(?s)```json\s*(.*?)\s*```"
+            
+            match = re.search(pattern, text)
+            if match:
+                # match.group(1) contains the content between the backticks
+                return match.group(1).strip()
+            return text
 
-        return df, pf
+        response_content = extract_json_block(response_content)
+        result = json.loads(response_content)
+        actions = result.get("actions", None)
+        if actions is None:
+            raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
+        return actions
         
     else: # Open source LLMs
         """
@@ -1808,10 +1820,10 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                     You can only use a lamp to turn it on and look at or examine other objects. Note: to look at or examine other objects, you should first pick it up."""
                                 break
 
-                        if not action_queue:
-                            action_passed = True
-                            successful_actions.extend(tem_action_queue)
-                            overall_memory += tem_memory
+                            if not action_queue:
+                                action_passed = True
+                                successful_actions.extend(tem_action_queue)
+                                overall_memory += tem_memory
                         # if action_passed:
                         #     successful_actions.extend(actions)
                         #     overall_memory += tem_memory
@@ -1846,8 +1858,8 @@ folder_name = "1_0414_Alfworld"
 result_name = folder_name
 
 ## Run baseline models
-run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld("o3-mini-2025-01-31", 11, 12, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## Run PDDL generation models
