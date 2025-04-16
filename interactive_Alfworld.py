@@ -1727,7 +1727,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                             env = textworld.gym.make(env_id)
                             obs, infos = env.reset()
                             for act in successful_actions:
-                                obs, _, _, infos = env.step(act)
+                                obs, _, done, infos = env.step(act)
 
                         actions, prompt = llm_to_actions_baseline(
                             model_name,
@@ -1750,6 +1750,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                         tem_memory = ""
 
                         for act in action_queue:
+                            _ = action_queue.pop(0)
                             obs, reward, done, infos = env.step(act)
                             action_text = "Action: " + act + "\n"
                             obs_text = summarize_obs(obs) + "\n"
@@ -1807,10 +1808,14 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                     You can only use a lamp to turn it on and look at or examine other objects. Note: to look at or examine other objects, you should first pick it up."""
                                 break
 
-                        if action_passed:
-                            successful_actions.extend(actions)
+                        if not action_queue:
+                            action_passed = True
+                            successful_actions.extend(tem_action_queue)
                             overall_memory += tem_memory
-                            break
+                        # if action_passed:
+                        #     successful_actions.extend(actions)
+                        #     overall_memory += tem_memory
+                        #     break
 
                     trial_step_record.append(within_step_tries)
                     trial_record.append(trial_step_record)
