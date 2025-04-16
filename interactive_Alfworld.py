@@ -1852,4 +1852,4 @@ result_name = folder_name
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+run_iterative_model("deepseek", 7, 10, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
