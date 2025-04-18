@@ -1858,8 +1858,8 @@ folder_name = "1_0414_Alfworld"
 result_name = folder_name
 
 ## Run baseline models
-# run_baseline_alfworld("o3-mini-2025-01-31", 11, 12, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## Run PDDL generation models
