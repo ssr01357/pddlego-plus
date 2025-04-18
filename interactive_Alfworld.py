@@ -80,7 +80,7 @@ def get_action_from_pddl(df, pf):
 
 
 # LLM set up
-close_source_model_lists = ['o3-mini', 'gpt-4o', 'gpt-4o-2024-05-13', 'o3-mini-2025-01-31']
+close_source_model_lists = ['o3-mini', 'gpt-4o', 'gpt-4o-2024-05-13', 'o3-mini-2025-01-31',"gpt-4.1-2025-04-14","o4-mini-2025-04-16"]
 def run_llm_model(prompt, model_name):
 
     if model_name in close_source_model_lists: # closed source LLMs
@@ -958,7 +958,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     prompt_obs_action_subgoal = f"""
         You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
 
-        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle.
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle. You can assume all receptacles are freely reachable.
         
         Now, {goal}
         Here are your current observations: {brief_obs}
@@ -1010,12 +1010,14 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             1. Do not assume unseen objects or relationships.
             2. Receptacle names must be preserved exactly.
             3. Do not proceed to Stage 2 before completing Stage 1.
+        
+        Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
     """ 
 
     prompt_obs_action_detailed = f"""
         You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
 
-        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle.
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle. You can assume all receptacles are freely reachable.
         
         Now, {goal}
         Here are your current observations: {brief_obs}
@@ -1093,6 +1095,8 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         1. some receptacles have numbers in their names. Always keep them as they are. For example, "towelholder1" should not be changed to "towelholder".
         2. Your initial goal should always be to go to a new location instead of put something into somewhere.
         3. Do not enter stage 2 when not finishing stage 1.
+
+        Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
     """ 
 
     prompt_prev_files = f"""
@@ -1286,7 +1290,7 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
 
         Your actions should exactly follow this phrasing — do not invent new formats. Every action must correspond to a valid command from the environment.
 
-        You must go to a receptacle first in order to use/open it or take/put objects from/on it.
+        You must go to a receptacle first in order to use/open it or take/put objects from/on it. You can assume all receptacles are freely reachable.
 
         The process involves two main stages:
 
@@ -1351,7 +1355,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     os.makedirs(folder_path)
                 file_name = f"{folder_path}/{today}_{fixed_model_name}_PDDL_{goal_type}_{trial}.txt"
 
-                if retry == 1 and os.path.exists(file_name):
+                if os.path.exists(file_name): # retry == 1 and 
                     open(file_name, 'w').close()  # empty file
                     print(f"[Trial {trial}] Retrying: cleared file and retrying...")
 
@@ -1858,14 +1862,17 @@ folder_name = "1_0414_Alfworld"
 result_name = folder_name
 
 ## Run baseline models
-run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## Run PDDL generation models
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("gpt-4o-2024-05-13", 7, 8, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+
+run_iterative_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
