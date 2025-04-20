@@ -1075,8 +1075,9 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
                     (opened ?recepatacle)
                 ) where recepatacle should be the recepatacle you want to open.
 
-        2. Using the Object to Complete the Task:
-            After you have located the object, you should always first pick up the object from that receptacle and update your goal to focus on how the object is used to complete the task. 
+        2. After you seeing the aim object in any receptacle, using the Object to Complete the Task:
+            After you have located the object (the object may have some numbers added), you should always first pick up the object from that receptacle and update your goal to focus on how the object is used to complete the task. Remember your goal is {goal}. Based on different adjectives, you may need to perform different actions for the object in different ways.
+
             This may involve more than simply transferring it from one place to another.
             For example: You might examine the object or a nearby receptacle to gather information. You may need to use another tool or device (like a lamp or a switch). Some tasks require you to slice, heat, cool, or clean the object using an appropriate receptacle (e.g., microwave, sink, fridge).
 
@@ -1546,9 +1547,6 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                 f.write(f"Current action_queue: {action_queue} \n")
                             
                             taken_action = action_queue.pop(0)
-                            # Feedback from plan-environment interaction
-                            # err_validate = validate_pddl(df, pf, taken_action)
-                            # print(err_validate)
 
                             obs, reward, done, infos = env.step(taken_action)
                             
@@ -1870,10 +1868,11 @@ result_name = folder_name
 ## Run PDDL generation models
 run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
-# run_iterative_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+
+run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
