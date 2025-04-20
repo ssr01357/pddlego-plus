@@ -3,7 +3,7 @@ import numpy as np
 import ast
 
 # Read CSV data
-df = pd.read_csv("output/1_0414_Alfworld.csv", header=None, 
+df = pd.read_csv("output/2_0419_Alfworld.csv", header=None, 
                  names=["date", "model", "model_type", "game_type", "goal_type", "game_id", "succeed", 
                         "final_step_index", "last_attempt_str", "steps_str"])
 
