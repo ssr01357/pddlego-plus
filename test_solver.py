@@ -18,126 +18,104 @@ def run_solver(domain_file, problem_file, solver):
     result = celery_result.json()['result']
     return result
 
-df = """(define (domain exploration)
-  (:requirements :strips :negative-preconditions :typing)
-
-  (:types
-    receptacle
-    object
-    microwaveReceptacle sinkbasinReceptacle fridgeReceptacle - receptacle
-    sharpobject - object
-  )
+df = """(define (domain room)
+  (:requirements :typing)
+  (:types receptacle object microwaveReceptacle sinkbasinReceptacle fridgeReceptacle sharpobject - object)
 
   (:predicates
     (at ?r - receptacle)
-    (visited ?r - receptacle)
     (opened ?r - receptacle)
-    (has ?r - receptacle ?o - object)
-    (sliced ?o - object)
+    (pickedup ?o - object)
+    (in ?o - object ?r - receptacle)
     (used ?o - object)
     (heated ?o - object)
     (cleaned ?o - object)
     (cooled ?o - object)
+    (sliced ?o - object)
   )
 
   (:action GotoLocation
     :parameters (?from - receptacle ?to - receptacle)
-    :precondition (and (at ?from) (not (visited ?to)))
-    :effect (and
-      (not (at ?from))
-      (at ?to)
-      (visited ?to)
-    )
+    :precondition (at ?from)
+    :effect (and (at ?to) (not (at ?from)))
   )
 
   (:action OpenObject
     :parameters (?r - receptacle)
-    :precondition (and (at ?r) (not (opened ?r)))
+    :precondition (at ?r)
     :effect (opened ?r)
   )
 
   (:action CloseObject
     :parameters (?r - receptacle)
-    :precondition (opened ?r)
+    :precondition (at ?r)
     :effect (not (opened ?r))
   )
 
   (:action PickupObject
     :parameters (?o - object ?r - receptacle)
-    :precondition (and (at ?r) (has ?r ?o))
-    :effect (not (has ?r ?o))
+    :precondition (at ?r)
+    :effect (and (pickedup ?o) (not (in ?o ?r)))
   )
 
   (:action PutObject
     :parameters (?o - object ?r - receptacle)
     :precondition (at ?r)
-    :effect (has ?r ?o)
+    :effect (in ?o ?r)
   )
 
-  (:action UseObject
+  (:action useObject
     :parameters (?o - object)
+    :precondition (pickedup ?o)
     :effect (used ?o)
   )
 
   (:action HeatObject
     :parameters (?o - object ?r - microwaveReceptacle)
-    :precondition (at ?r)
+    :precondition (and (at ?r) (in ?o ?r))
     :effect (heated ?o)
   )
 
   (:action CleanObject
     :parameters (?o - object ?r - sinkbasinReceptacle)
-    :precondition (at ?r)
+    :precondition (and (at ?r) (in ?o ?r))
     :effect (cleaned ?o)
   )
 
   (:action CoolObject
     :parameters (?o - object ?r - fridgeReceptacle)
-    :precondition (at ?r)
+    :precondition (and (at ?r) (in ?o ?r))
     :effect (cooled ?o)
   )
 
   (:action SliceObject
-    :parameters (?r - receptacle ?co - object ?sharp_o - sharpobject)
-    :precondition (at ?r)
+    :parameters (?loc - receptacle ?co - object ?sharp_o - sharpobject)
+    :precondition (at ?loc)
     :effect (sliced ?co)
   )
-)
+) 
 """
 
-pf = """(define (problem explore-room)
-  (:domain exploration)
-
+pf = """(define (problem room-prob)
+  (:domain room)
   (:objects
-    init_receptacle
-    cabinet1 cabinet2 cabinet3 cabinet4 cabinet5 cabinet6 cabinet7 cabinet8 cabinet9 cabinet10
-    coffeemachine1
-    countertop1 countertop2 countertop3
-    diningtable1
-    drawer1 drawer2 drawer3 drawer4 drawer5 drawer6
-    stoveburner1 stoveburner2 stoveburner3 stoveburner4
-    toaster1
-    - receptacle
-
-    microwave1
-    - microwaveReceptacle
-
-    sinkbasin1
-    - sinkbasinReceptacle
-
-    fridge1
-    - fridgeReceptacle
+    init_receptacle - receptacle
+    cabinet21 cabinet20 cabinet19 cabinet18 cabinet17 cabinet16 cabinet15 cabinet14 cabinet13 cabinet12 cabinet11 cabinet10 cabinet9 cabinet8 cabinet7 cabinet6 cabinet5 cabinet4 cabinet3 cabinet2 cabinet1 - receptacle
+    countertop2 countertop1 - receptacle
+    diningtable1 - receptacle
+    drawer5 drawer4 drawer3 drawer2 drawer1 - receptacle
+    fridge1 - fridgeReceptacle
+    garbagecan1 - receptacle
+    microwave1 - microwaveReceptacle
+    sinkbasin1 - sinkbasinReceptacle
+    stoveburner4 stoveburner3 stoveburner2 stoveburner1 - receptacle
+    coffeemachine1 toaster1 - object
   )
-
   (:init
     (at init_receptacle)
-    (visited init_receptacle)
   )
-
-  (:goal
-    (at cabinet10)
-  )
-)
+  (:goal (at cabinet21))
+) 
 """
 
 print(run_solver(df, pf, "dual-bfws-ffparser"))

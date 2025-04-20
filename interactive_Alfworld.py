@@ -854,7 +854,7 @@ print(goal)
 print("Valid actions:", valid_actions)
 
 
-def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message=None, goal_type='detailed'):
+def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message=None, goal_type='detailed', goal=goal):
     prompt_format = f"""
         Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
         The format should strictly be:
@@ -963,7 +963,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         Now, {goal}
         Here are your current observations: {brief_obs}
 
-        The following actions are allowed: 
+        The following actions are allowed: (There are only two types: object and receptacle)
         1. go to a receptacle
             :action GotoLocation
             :parameters (?from - receptacle ?to - receptacle)
@@ -1022,7 +1022,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         Now, {goal}
         Here are your current observations: {brief_obs}
 
-        Only the following actions are allowed: 
+        Only the following actions are allowed: (There are only two types: object and receptacle)
         1. go to a receptacle
             :action GotoLocation
             :parameters (?from - receptacle ?to - receptacle)
@@ -1172,7 +1172,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     return df, pf, err, prompt
 
 
-def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None, goal_type="detailed"):
+def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None, goal_type="detailed", goal=goal):
     # prompt_general = f"""
     #     You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
     #     Your task is to interact with objects and receptacles to complete a goal step by step.
@@ -1484,7 +1484,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                 
                                 if not df and not pf: # First step no need duplicates detection
                                     num_tries = 0
-                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, goal_type=goal_type) # error 1 here
+                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, goal_type=goal_type, goal=goal) # error 1 here
                                     action, err_2 = get_action_from_pddl(df, pf) # error 2 here
                                     with open(file_name, "a") as f:
                                         f.write(f"--Small Loop--: {num_tries} \n")
@@ -1494,7 +1494,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                         f.write(f"Actions from solver(df, pf): {action} \n")
 
                                     while not action and num_tries < 5:
-                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, False, edit, goal_type=goal_type)
+                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, False, edit, goal_type=goal_type, goal=goal)
                                         action, err_2 = get_action_from_pddl(df, pf)
                                         num_tries += 1
                                         
@@ -1508,7 +1508,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                     num_tries = 0
                                     # Every time read new error message from larger loop
                                     # In llm_to_pddl, detect if new large loop error message exists
-                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type) # need to add new error message
+                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type, goal=goal) # need to add new error message
                                     action, err_2 = get_action_from_pddl(df, pf)
 
                                     with open(file_name, "a") as f:
@@ -1519,7 +1519,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                                         f.write(f"Actions from solver(df, pf): {action} \n")
 
                                     while not action and num_tries < 5:
-                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type)
+                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type, goal=goal)
                                         action, err_2 = get_action_from_pddl(df, pf)
                                         num_tries += 1
 
@@ -1751,7 +1751,8 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                             valid_actions,
                             overall_memory,
                             large_loop_error_message,
-                            goal_type=goal_type
+                            goal_type=goal_type,
+                            goal=goal
                         )
 
                         with open(file_name, "a") as f:
@@ -1858,7 +1859,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
 
 i = 0
 num_trials = 10
-folder_name = "1_0414_Alfworld"
+folder_name = "2_0419_Alfworld"
 result_name = folder_name
 
 ## Run baseline models
