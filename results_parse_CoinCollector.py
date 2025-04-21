@@ -2,7 +2,7 @@ import pandas as pd
 import ast
 
 # Read CSV data
-df = pd.read_csv("output/alfworld_detailed_results.csv", header=None, 
+df = pd.read_csv("output/3_0421_CC.csv", header=None, 
                  names=["date", "model", "model_type", "goal_type", "game_id", "succeed", 
                         "final_step_index", "last_attempt_str", "steps_str"])
 
