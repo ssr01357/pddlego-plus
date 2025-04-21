@@ -21,25 +21,41 @@ client = OpenAI()
 
 
 # Solver set up
-def run_solver(domain_file, problem_file, solver):
+def run_solver(domain_file, problem_file, solver, max_retries=3):
     # domain_file = open(f'domain.pddl').read()
     # problem_file = open(f'problem.pddl').read()
 
     req_body = {"domain" : domain_file, "problem" : problem_file}
 
-    # Send job request to solve endpoint
-    solve_request_url=requests.post(f"https://solver.planning.domains:5001/package/{solver}/solve", json=req_body).json()
+    retries = 0
 
-    # Query the result in the job
-    celery_result=requests.post('https://solver.planning.domains:5001' + solve_request_url['result'])
+    while retries < max_retries:
+        try:
+            # Send job request to solve endpoint
+            solve_request_url = requests.post(
+                f"https://solver.planning.domains:5001/package/{solver}/solve", 
+                json=req_body
+            ).json()
 
-    while celery_result.json().get("status","")== 'PENDING':
-        # Query the result every 0.5 seconds while the job is executing
-        celery_result=requests.post('https://solver.planning.domains:5001' + solve_request_url['result'])
-        time.sleep(0.5)
+            # Query the result in the job
+            celery_result = requests.post(
+                'https://solver.planning.domains:5001' + solve_request_url['result']
+            )
 
-    result = celery_result.json()['result']
-    return result
+            while celery_result.json().get("status", "") == 'PENDING':
+                time.sleep(0.5)
+                celery_result = requests.post(
+                    'https://solver.planning.domains:5001' + solve_request_url['result']
+                )
+
+            return celery_result.json()['result']
+
+        except Exception as e:
+            print(f"Error encountered: {e}. Retrying in 5 seconds... (Attempt {retries+1}/{max_retries})")
+            retries += 1
+            time.sleep(5)
+
+    raise RuntimeError("Max retries exceeded. Failed to get result from solver.")
 
 def get_action_from_pddl(df, pf):
     # run_fast_downward(path_to_df, path_to_pf)
@@ -50,10 +66,11 @@ def get_action_from_pddl(df, pf):
 
 
 # LLM set up
-close_source_model_lists = ['o3-mini', 'gpt-4o', 'gpt-4o-2024-05-13', 'o3-mini-2025-01-31']
-def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"):
+close_source_model_lists = ['gpt-4o-2024-05-13','o3-mini-2025-01-31',"gpt-4.1-2025-04-14","o4-mini-2025-04-16"]
+def run_llm_model(prompt, model_name):
 
     if model_name in close_source_model_lists: # closed source LLMs
+        client = OpenAI()
         response = client.chat.completions.create(
             model=model_name,
             messages=[{"role": "user", "content": prompt}],
@@ -74,6 +91,33 @@ def run_llm_model(prompt, model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
         # except json.JSONDecodeError:
         #     return None, None
 
+        df = result.get("df", None)
+        pf = result.get("pf", None)
+
+        # if df is None or pf is None:
+        #     raise ValueError("Missing 'df' or 'pf' in the response. Check the prompt or the model output.")
+
+        return df, pf
+
+    elif model_name == 'deepseek':
+        deepseekAPI = os.getenv("deepseek_API")
+        client = OpenAI(api_key=deepseekAPI, base_url="https://api.deepseek.com")
+
+        response = client.chat.completions.create(
+            model="deepseek-reasoner",
+            messages=[
+                {"role": "system", "content": "You are generating PDDL according to your observations."},
+                {"role": "user", "content": prompt},
+            ],
+            stream=False
+        )
+
+        response_content = response.choices[0].message.content
+
+        if response_content.startswith("```json"):
+            response_content = response_content.lstrip("```json").rstrip("```").strip()
+
+        result = json.loads(response_content)
         df = result.get("df", None)
         pf = result.get("pf", None)
 
@@ -193,6 +237,42 @@ def run_gpt_for_actions_baseline(prompt, model_name):
         if actions is None:
             raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
 
+        return actions
+
+    elif model_name == 'deepseek':
+        deepseekAPI = os.getenv("deepseek_API")
+        client = OpenAI(api_key=deepseekAPI, base_url="https://api.deepseek.com")
+
+        response = client.chat.completions.create(
+            model="deepseek-reasoner",
+            messages=[
+                {"role": "system", "content": "You are generating PDDL according to your observations."},
+                {"role": "user", "content": prompt},
+            ],
+            stream=False
+        )
+
+        response_content = response.choices[0].message.content
+
+        if response_content.startswith("```json"):
+            response_content = response_content.lstrip("```json").rstrip("```").strip()
+
+        def extract_json_block(text):
+            # This pattern captures everything between ```json and the next ```
+            # (?s) makes '.' match newlines as well
+            pattern = r"(?s)```json\s*(.*?)\s*```"
+            
+            match = re.search(pattern, text)
+            if match:
+                # match.group(1) contains the content between the backticks
+                return match.group(1).strip()
+            return text
+
+        response_content = extract_json_block(response_content)
+        result = json.loads(response_content)
+        actions = result.get("actions", None)
+        if actions is None:
+            raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
         return actions
         
     else: # Open source LLMs
@@ -662,7 +742,7 @@ valid_actions.remove('look around')
 valid_actions.remove('inventory')
 # brief_obs = "Action: look around\n" + summarize_obs(obs)+'\n'
 
-def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message = None):
+def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message = None, goal_type='detailed'):
     prompt_format = f"""
         Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
         The format should strictly be:
@@ -711,7 +791,28 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         }
     """
 
-    prompt_obs_action = f"""
+    # prompt_obs_action_subgoal = f"""
+    #     You are in an environment that you explore step by step. You must build and update PDDL files of the environment based on only your observations. 
+    #     Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
+    #     Do not assume that there will be a door connecting rooms.
+    #     Your task is always to keep exploration and go to a location you have not visited yet.
+    #     In other words, your goal should go to other not visited location.
+    #     If you enter a room, make sure you put everything you observed such as the direction in the problem file.
+    #     Here are your current observations: {brief_obs}
+    #     Here are some valid actions you can take: {valid_actions}
+    #     You should generate df and pf strictly follow this valid actions. There are in total 2 actions, that should exactly be the following two:
+    #     1. :action open-door
+    #         :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    #     2. :action move
+    #         :parameters (?from - location ?to - location ?dir - direction)
+    #     You should have a goal in the problem file like this: 
+    #     (:goal 
+    #         (at ?location)
+    #     ) where location should be somewhere not visited
+    #     Note: in problem file's init, you shouldn't have "not ()" but only the single status
+    # """ 
+
+    prompt_obs_action_detailed = f"""
         You are in an environment that you explore step by step. You must build and update PDDL files of the environment based on only your observations. 
         Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
         Do not assume that there will be a door connecting rooms.
@@ -731,6 +832,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         ) where location should be somewhere not visited
         Note: in problem file's init, you shouldn't have "not ()" but only the single status
     """ 
+    
 
     prompt_prev_files = f"""
         This is previous domain file: {prev_df}
@@ -768,7 +870,10 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         prompt = prompt_edit
 
     # all prompts should have observations and actions
-    prompt += prompt_obs_action
+    if goal_type == 'detailed':
+        prompt += prompt_obs_action_detailed
+    elif goal_type == 'subgoal':
+        prompt += prompt_obs_action_subgoal
 
     if prev_df and prev_pf:
         prompt += prompt_prev_files
@@ -913,228 +1018,250 @@ def merge_problem_files_code(old_pf: str, new_pf: str) -> str:
 
 
 # Main functions here:
-def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial = 0, end_trial = 11):
+def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
     # trial_record = 
     # structured_info_record = "output/summary"
     for trial in range(start_trial, end_trial):
-        coin_found = False
-        today = date.today()
+        retry = 0
+        while retry < 2:  # allow up to 2 attempts per trial
+            try:
+                coin_found = False
+                today = date.today()
 
-        fixed_model_name = model_name.replace("/","_")
-        file_name = f"output/07_022825_merging/{today}_{fixed_model_name}_{trial}.txt"
-        trial_record = []
-        
-        env = TextWorldExpressEnv(envStepLimit=100)
-        NUM_LOCATIONS = 11
-        env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-        obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-        with open(file_name, "a") as f:  # "w" creates a new file or overwrites an existing file
-            f.write(f"Observations: {obs} \n") 
-            f.write(f"Gold path: {env.getGoldActionSequence()} \n")
-            f.write(f"Valid Actions: {infos['validActions']} \n")
-            f.write(f"taskDescription: {infos['taskDescription']} \n")
+                fixed_model_name = model_name.replace("/","_")
 
-        # task_description = infos['taskDescription']
-        valid_actions = sorted(infos['validActions'])
-        valid_actions.remove('look around')
-        valid_actions.remove('inventory')
+                folder_path = f"output/{folder_name}"
+                if not os.path.exists(folder_path):
+                    os.makedirs(folder_path)
 
-        MAX_STEPS = 20
+                file_name = f"{folder_path}/{today}_{fixed_model_name}_PDDL_{goal_type}_{trial}.txt"
+                
+                if os.path.exists(file_name): # retry == 1 and 
+                    open(file_name, 'w').close()  # empty file
+                    print(f"[Trial {trial}] Retrying: cleared file and retrying...")
 
-        brief_obs = "Action: look around\n" + summarize_obs(obs)+'\n' # initial definition
-        with open(file_name, "a") as f:
-            f.write(f"brief_obs: {brief_obs} \n") 
-        # print(brief_obs)
+                trial_record = []
+                
+                env = TextWorldExpressEnv(envStepLimit=100)
+                NUM_LOCATIONS = 11
+                env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+                obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+                with open(file_name, "a") as f:  # "w" creates a new file or overwrites an existing file
+                    f.write(f"Observations: {obs} \n") 
+                    f.write(f"Gold path: {env.getGoldActionSequence()} \n")
+                    f.write(f"Valid Actions: {infos['validActions']} \n")
+                    f.write(f"taskDescription: {infos['taskDescription']} \n")
 
-        action_queue = []
-        obs_queue = []
-        df = ""
-        pf = ""
-        all_actions = []
-        successful_actions = []
-        edit = False
-        end_game = False
+                # task_description = infos['taskDescription']
+                valid_actions = sorted(infos['validActions'])
+                valid_actions.remove('look around')
+                valid_actions.remove('inventory')
 
-        overall_memory = brief_obs
+                MAX_STEPS = 20
 
-        for step_id in range(0, MAX_STEPS):
-            with open(file_name, "a") as f:
-                f.write(f"\n\n====Step {step_id}==== \n")
-
-            trial_step_record = []
-            within_step_tries = 0
-            action_passed = False
-            large_loop_error_message = ""
-
-            # Under step#, it should repeat until run all actions and found no error
-            while within_step_tries < 5 and not action_passed:
+                brief_obs = "Action: look around\n" + summarize_obs(obs)+'\n' # initial definition
                 with open(file_name, "a") as f:
-                    f.write(f'\n----Larger Loop No. {within_step_tries}---- \n') 
-                    f.write(f'successful_actions: {successful_actions} \n')
+                    f.write(f"brief_obs: {brief_obs} \n") 
+                # print(brief_obs)
 
-                within_step_tries += 1
+                action_queue = []
+                obs_queue = []
+                df = ""
+                pf = ""
+                all_actions = []
+                successful_actions = []
+                edit = False
+                end_game = False
 
-                if within_step_tries > 1: # second or third ... time in the larger loop
-                    # reset env by refilling successful actions (stupid but useful)
-                    env = TextWorldExpressEnv(envStepLimit=100)
-                    NUM_LOCATIONS = 11
-                    env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-                    obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-                    for successful_action in successful_actions:
-                        obs, reward, done, infos = env.step(successful_action)
+                overall_memory = brief_obs
 
-                action_queue = [] # reset action_queue
-                tem_action_queue = []
-                tem_memory = ""
-
-                start_checkpoint = True
-                while start_checkpoint or action_queue:
+                for step_id in range(0, MAX_STEPS):
                     with open(file_name, "a") as f:
-                        f.write(f'Small Loop, action_queue: {action_queue} \n')
-                    start_checkpoint = False
+                        f.write(f"\n\n====Step {step_id}==== \n")
 
-                    if not action_queue:
-                        if obs_queue:
-                            brief_obs = "\n".join(obs_queue)
-                            obs_queue = []
-                        action = ""
-                        
-                        if not df and not pf: # First step no need duplicates detection
-                            num_tries = 0
-                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs) # error 1 here
-                            action, err_2 = get_action_from_pddl(df, pf) # error 2 here
+                    trial_step_record = []
+                    within_step_tries = 0
+                    action_passed = False
+                    large_loop_error_message = ""
+
+                    # Under step#, it should repeat until run all actions and found no error
+                    while within_step_tries < 5 and not action_passed:
+                        with open(file_name, "a") as f:
+                            f.write(f'\n----Larger Loop No. {within_step_tries}---- \n') 
+                            f.write(f'successful_actions: {successful_actions} \n')
+
+                        within_step_tries += 1
+
+                        if within_step_tries > 1: # second or third ... time in the larger loop
+                            # reset env by refilling successful actions (stupid but useful)
+                            env = TextWorldExpressEnv(envStepLimit=100)
+                            NUM_LOCATIONS = 11
+                            env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+                            obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+                            for successful_action in successful_actions:
+                                obs, reward, done, infos = env.step(successful_action)
+
+                        action_queue = [] # reset action_queue
+                        tem_action_queue = []
+                        tem_memory = ""
+
+                        start_checkpoint = True
+                        while start_checkpoint or action_queue:
                             with open(file_name, "a") as f:
-                                f.write(f"--Small Loop--: {num_tries} \n")
-                                f.write(f"Error: {err} \n")
-                                f.write(f"Prompt: {prompt} \n") 
-                                f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
-                                f.write(f"Actions from solver(df, pf): {action} \n")
+                                f.write(f'Small Loop, action_queue: {action_queue} \n')
+                            start_checkpoint = False
 
-                            while not action and num_tries < 5:
-                                df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, False, edit)
-                                action, err_2 = get_action_from_pddl(df, pf)
-                                num_tries += 1
+                            if not action_queue:
+                                if obs_queue:
+                                    brief_obs = "\n".join(obs_queue)
+                                    obs_queue = []
+                                action = ""
                                 
-                                with open(file_name, "a") as f:
-                                    f.write(f"--Small Loop--: {num_tries} \n")
-                                    f.write(f"Error: {err} \n")
-                                    f.write(f"Prompt: {prompt} \n") 
-                                    f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
-                                    f.write(f"Actions from solver(df, pf): {action} \n")
-                        else:
-                            num_tries = 0
-                            # Every time read new error message from larger loop
-                            # In llm_to_pddl, detect if new large loop error message exists
-                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message) # need to add new error message
-                            action, err_2 = get_action_from_pddl(df, pf)
+                                if not df and not pf: # First step no need duplicates detection
+                                    num_tries = 0
+                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs) # error 1 here
+                                    action, err_2 = get_action_from_pddl(df, pf) # error 2 here
+                                    with open(file_name, "a") as f:
+                                        f.write(f"--Small Loop--: {num_tries} \n")
+                                        f.write(f"Error: {err} \n")
+                                        f.write(f"Prompt: {prompt} \n") 
+                                        f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
+                                        f.write(f"Actions from solver(df, pf): {action} \n")
+
+                                    while not action and num_tries < 5:
+                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, False, edit)
+                                        action, err_2 = get_action_from_pddl(df, pf)
+                                        num_tries += 1
+                                        
+                                        with open(file_name, "a") as f:
+                                            f.write(f"--Small Loop--: {num_tries} \n")
+                                            f.write(f"Error: {err} \n")
+                                            f.write(f"Prompt: {prompt} \n") 
+                                            f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
+                                            f.write(f"Actions from solver(df, pf): {action} \n")
+                                else:
+                                    num_tries = 0
+                                    # Every time read new error message from larger loop
+                                    # In llm_to_pddl, detect if new large loop error message exists
+                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message) # need to add new error message
+                                    action, err_2 = get_action_from_pddl(df, pf)
+
+                                    with open(file_name, "a") as f:
+                                        f.write(f"--Small Loop--: {num_tries} \n")
+                                        f.write(f"Error: {err} \n")
+                                        f.write(f"Prompt: {prompt} \n") 
+                                        f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
+                                        f.write(f"Actions from solver(df, pf): {action} \n")
+
+                                    while not action and num_tries < 5:
+                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message)
+                                        action, err_2 = get_action_from_pddl(df, pf)
+                                        num_tries += 1
+
+                                        with open(file_name, "a") as f:
+                                            f.write(f"--Small Loop--: {num_tries} \n")
+                                            f.write(f"Error: {err} \n")
+                                            f.write(f"Prompt: {prompt} \n") 
+                                            f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
+                                            f.write(f"Actions from solver(df, pf): {action} \n")
+
+                                # append which loop it stops
+                                # Must be under first time generating the actions
+                                trial_step_record.append([within_step_tries, num_tries])
+
+                                if action:
+                                    action_queue.extend(action)
+                                    tem_action_queue.extend(action) # temporary action queue to put in successful_actions
+                                    all_actions.extend(action) # to detect duplicated
+                                else:
+                                    end_game = True
+                                    break
 
                             with open(file_name, "a") as f:
-                                f.write(f"--Small Loop--: {num_tries} \n")
-                                f.write(f"Error: {err} \n")
-                                f.write(f"Prompt: {prompt} \n") 
-                                f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
-                                f.write(f"Actions from solver(df, pf): {action} \n")
+                                f.write(f"Current action_queue: {action_queue} \n")
+                            
+                            taken_action = action_queue.pop(0)
+                            # Feedback from plan-environment interaction
+                            # err_validate = validate_pddl(df, pf, taken_action)
+                            # print(err_validate)
 
-                            while not action and num_tries < 5:
-                                df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message)
-                                action, err_2 = get_action_from_pddl(df, pf)
-                                num_tries += 1
+                            obs, reward, done, infos = env.step(taken_action)
 
+                            # Directly end the game if found coin
+                            if "coin" in obs:
+                                taken_action = "take coin"
+                                obs, reward, done, infos = env.step(taken_action)
+                                end_game = True
                                 with open(file_name, "a") as f:
-                                    f.write(f"--Small Loop--: {num_tries} \n")
-                                    f.write(f"Error: {err} \n")
-                                    f.write(f"Prompt: {prompt} \n") 
-                                    f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
-                                    f.write(f"Actions from solver(df, pf): {action} \n")
+                                    f.write('Coin found!')
+                                    coin_found = True
+                                break
+                            
+                            action_text = "Action: " + taken_action + "\n"
+                            obs_text = summarize_obs(obs) + "\n"
 
-                        # append which loop it stops
-                        # Must be under first time generating the actions
-                        trial_step_record.append([within_step_tries, num_tries])
+                            brief_obs = action_text + obs_text
 
-                        if action:
-                            action_queue.extend(action)
-                            tem_action_queue.extend(action) # temporary action queue to put in successful_actions
-                            all_actions.extend(action) # to detect duplicated
-                        else:
+                            obs_queue.append(brief_obs)
+                            with open(file_name, "a") as f:
+                                f.write(f"> {taken_action} \n {brief_obs} \n")
+
+                            # Define action passed
+                            if "You can't move there, the door is closed." in brief_obs:
+                                large_loop_error_message = f"This is the action you take: {taken_action}. \
+                                    The door that you are moving to is closed. \
+                                    You should first open door to that direction then move there!"
+                                break
+                            elif "That is already open." in brief_obs:
+                                large_loop_error_message = f"This is the action you take: {taken_action}. \
+                                    You try to open a door that is already open. You already visited here. Make sure the status of door is correct."
+                                break
+                            elif "I'm not sure what you mean." in brief_obs:
+                                action_passed = False
+                                if "open door" in taken_action:
+                                    large_loop_error_message = f'This is the action you take: {taken_action}. \
+                                        When you try to open door, there is no door here or there is nothing in this direction.\
+                                        If there is no door, you can directly move to that direction.\n'
+                                elif "move" in taken_action:
+                                    large_loop_error_message = f'This is the action you take: {taken_action}. \
+                                        You cannot move to that direction. Review the predicate of your actions and the problem files to check the status.'
+                                else:
+                                    large_loop_error_message = f'This is the action you take: {taken_action}. \
+                                        You got the environment error!'
+                                break
+
+                            # append into overall memory and dictionary format
+                            tem_memory += brief_obs
+
+                            # It should be the last step and passed all actions
+                            if not action_queue:
+                                action_passed = True
+                                successful_actions.extend(tem_action_queue)
+                                overall_memory += tem_memory
+
+                        if (within_step_tries == 5 and not action_passed) or end_game:
                             end_game = True
                             break
 
-                    with open(file_name, "a") as f:
-                        f.write(f"Current action_queue: {action_queue} \n")
-                    
-                    taken_action = action_queue.pop(0)
-                    # Feedback from plan-environment interaction
-                    # err_validate = validate_pddl(df, pf, taken_action)
-                    # print(err_validate)
+                    trial_record.append(trial_step_record)
 
-                    obs, reward, done, infos = env.step(taken_action)
-
-                    # Directly end the game if found coin
-                    if "coin" in obs:
-                        taken_action = "take coin"
-                        obs, reward, done, infos = env.step(taken_action)
-                        end_game = True
-                        with open(file_name, "a") as f:
-                            f.write('Coin found!')
-                            coin_found = True
+                    if end_game:
                         break
-                    
-                    action_text = "Action: " + taken_action + "\n"
-                    obs_text = summarize_obs(obs) + "\n"
-
-                    brief_obs = action_text + obs_text
-
-                    obs_queue.append(brief_obs)
-                    with open(file_name, "a") as f:
-                        f.write(f"> {taken_action} \n {brief_obs} \n")
-
-                    # Define action passed
-                    if "You can't move there, the door is closed." in brief_obs:
-                        large_loop_error_message = f"This is the action you take: {taken_action}. \
-                            The door that you are moving to is closed. \
-                            You should first open door to that direction then move there!"
-                        break
-                    elif "That is already open." in brief_obs:
-                        large_loop_error_message = f"This is the action you take: {taken_action}. \
-                            You try to open a door that is already open. You already visited here. Make sure the status of door is correct."
-                        break
-                    elif "I'm not sure what you mean." in brief_obs:
-                        action_passed = False
-                        if "open door" in taken_action:
-                            large_loop_error_message = f'This is the action you take: {taken_action}. \
-                                When you try to open door, there is no door here or there is nothing in this direction.\
-                                If there is no door, you can directly move to that direction.\n'
-                        elif "move" in taken_action:
-                            large_loop_error_message = f'This is the action you take: {taken_action}. \
-                                You cannot move to that direction. Review the predicate of your actions and the problem files to check the status.'
-                        else:
-                            large_loop_error_message = f'This is the action you take: {taken_action}. \
-                                You got the environment error!'
-                        break
-
-                    # append into overall memory and dictionary format
-                    tem_memory += brief_obs
-
-                    # It should be the last step and passed all actions
-                    if not action_queue:
-                        action_passed = True
-                        successful_actions.extend(tem_action_queue)
-                        overall_memory += tem_memory
-
-                if (within_step_tries == 5 and not action_passed) or end_game:
-                    end_game = True
-                    break
-
-            trial_record.append(trial_step_record)
-
-            if end_game:
+                
+                with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
+                    # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
+                    model_type = "PDDL"
+                    data_row = [today, model_name, model_type, goal_type, trial, coin_found, len(trial_record)-1,trial_record[-1][-1], trial_record]
+                    # [today, model_name, trial, coin_found, len(trial_record)-1,trial_record[-1][-1], trial_record]
+                    writer = csv.writer(csvfile)
+                    writer.writerow(data_row)
                 break
-        
-        with open("output/merging_results.csv", "a", newline="") as csvfile:
-            # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
-            data_row = [today, model_name, trial, coin_found, len(trial_record)-1,trial_record[-1][-1], trial_record]
-            writer = csv.writer(csvfile)
-            writer.writerow(data_row)
+
+            except Exception as e:
+                error_log_path = f"output/{folder_name}/errors.txt"
+                with open(error_log_path, "a") as f:
+                    f.write(f"Trial {trial} (Attempt {retry+1}) model ({model_name}) failed: {str(e)}\n")
+                retry += 1
 
 
 def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031825_alfworld", result_name="alfworld_results"):
@@ -1308,237 +1435,6 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
             writer = csv.writer(csvfile)
             writer.writerow(data_row)
 
-
-# Merging method: only observation generate problem files
-# def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=11, merging_method="llm"):
-#     """
-#     For the first step, generate the PF directly using llm_to_pddl.
-#     For subsequent steps:
-#       1. Generate an independent PF from the new observation (using generate_problem_file_from_observation).
-#       2. Merge this new PF with the previous PF (pf_to_merge) to obtain a merged_pf.
-#       3. Use llm_to_pddl (with small and large loops) to fix the merged PF.
-    
-#     The domain file (df) and pf_to_merge are reinitialized per trial.
-#     """
-
-#     for trial in range(start_trial, end_trial):
-#         coin_found = False
-#         today = date.today()
-#         file_name = f"output/07_022825_merging/merging_{today}_{model_name.replace('/','_')}_{trial}.txt"
-#         trial_record = []
-
-#         # Initialize environment
-#         env = TextWorldExpressEnv(envStepLimit=100)
-#         NUM_LOCATIONS = 11
-#         env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-#         obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-
-#         with open(file_name, "a") as f:
-#             f.write(f"Observations: {obs} \n")
-#             f.write(f"Gold path: {env.getGoldActionSequence()} \n")
-#             f.write(f"Valid Actions: {infos['validActions']} \n")
-#             f.write(f"taskDescription: {infos['taskDescription']} \n")
-
-#         # We'll remove these for clarity
-#         valid_actions = sorted(infos['validActions'])
-#         if 'look around' in valid_actions:
-#             valid_actions.remove('look around')
-#         if 'inventory' in valid_actions:
-#             valid_actions.remove('inventory')
-
-#         MAX_STEPS = 20
-
-#         # Start observation
-#         brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
-#         with open(file_name, "a") as f:
-#             f.write(f"brief_obs: {brief_obs} \n")
-
-#         # Some tracking variables
-#         action_queue = []
-#         obs_queue = []
-#         df = ""
-#         pf_to_merge = "" # This will hold the merged PF from previous steps
-#         all_actions = []
-#         successful_actions = []
-#         overall_memory = brief_obs
-
-#         end_game = False
-
-#         for step_id in range(MAX_STEPS):
-#             with open(file_name, "a") as f:
-#                 f.write(f"\n\n====Step {step_id}==== \n")
-
-#             trial_step_record = []
-#             within_step_tries = 0
-#             action_passed = False
-#             large_loop_error_message = ""
-
-#             # We'll attempt up to 5 large-loop tries for each step
-#             while within_step_tries < 5 and not action_passed:
-#                 with open(file_name, "a") as f:
-#                     f.write(f"\n----Larger Loop No. {within_step_tries}---- \n")
-#                     f.write(f"successful_actions: {successful_actions} \n")
-
-#                 within_step_tries += 1
-
-#                 # If not the first iteration in the large loop, re-simulate successful actions so far
-#                 if within_step_tries > 1:
-#                     env = TextWorldExpressEnv(envStepLimit=100)
-#                     env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-#                     obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-#                     for successful_action in successful_actions:
-#                         obs, reward, done, infos = env.step(successful_action)
-
-#                 action_queue = []
-#                 tem_action_queue = []
-#                 tem_memory = ""
-#                 start_checkpoint = True
-
-#                 # ---- Small loop starts ----
-#                 while start_checkpoint or action_queue:
-#                     with open(file_name, "a") as f:
-#                         f.write(f'Small Loop, action_queue: {action_queue} \n')
-
-#                     start_checkpoint = False
-
-#                     if not action_queue:
-#                         # Combine any queued observations
-#                         if obs_queue:
-#                             brief_obs = "\n".join(obs_queue)
-#                             obs_queue = []
-
-#                         num_tries = 0
-
-#                         # Generate new PF from the observation
-#                         df, pf, err, prompt = generate_problem_file_from_observation(
-#                             observation=brief_obs,
-#                             model_name=model_name,
-#                             domain_file=df  # Initially, df is an empty string
-#                         )
-
-#                         action, err_2 = get_action_from_pddl(df, pf) # error 2 here
-
-#                         with open(file_name, "a") as f:
-#                             f.write(f"--Small Loop--: {num_tries} \n")
-#                             f.write(f"Error: {err} & {err_2} \n")
-#                             f.write(f"Prompt: {prompt} \n") 
-#                             f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
-#                             f.write(f"Actions from solver(df, pf): {action} \n")
-
-#                         while not action and num_tries < 5:
-#                             df, pf, err, prompt = generate_problem_file_from_observation(
-#                                 observation=brief_obs,
-#                                 model_name=model_name,
-#                                 domain_file=df,
-#                                 err=err, 
-#                                 err_2=err_2
-#                             )
-#                             action, err_2 = get_action_from_pddl(df, pf)
-#                             num_tries += 1
-
-#                             with open(file_name, "a") as f:
-#                                 f.write(f"--Small Loop--: {num_tries} \n")
-#                                 f.write(f"Error: {err} & {err_2} \n")
-#                                 f.write(f"Prompt: {prompt} \n") 
-#                                 f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
-#                                 f.write(f"Actions from solver(df, pf): {action} \n")
-                        
-#                         trial_step_record.append([within_step_tries, num_tries])
-
-#                         if not action:
-#                             end_game = True
-#                             break
-#                         else:
-#                             action_queue.extend(action)
-#                             all_actions.extend(action)
-#                             tem_action_queue.extend(action)
-
-#                     with open(file_name, "a") as f:
-#                         f.write(f"Current action_queue: {action_queue} \n")
-
-#                     if not action_queue:
-#                         break
-
-#                     # Pop the first action
-#                     taken_action = action_queue.pop(0)
-#                     obs, reward, done, infos = env.step(taken_action)
-
-#                     if "coin" in obs:
-#                         # If we see 'coin' in obs, let's pick it up and end the game
-#                         taken_action2 = "take coin"
-#                         obs, reward, done, infos = env.step(taken_action2)
-#                         coin_found = True
-#                         end_game = True
-#                         with open(file_name, "a") as f:
-#                             f.write("Coin found!\n")
-#                         break
-
-#                     action_text = "Action: " + taken_action + "\n"
-#                     obs_text = summarize_obs(obs) + "\n"
-#                     brief_obs = action_text + obs_text
-#                     obs_queue.append(brief_obs)
-
-#                     with open(file_name, "a") as f:
-#                         f.write(f"> {taken_action} \n {brief_obs} \n")
-
-#                     # Basic checks for environment error messages
-#                     if "You can't move there, the door is closed." in brief_obs:
-#                         large_loop_error_message = f"This is the action you take: {taken_action}. The door is closed."
-#                         break
-#                     elif "That is already open." in brief_obs:
-#                         large_loop_error_message = f"This is the action you take: {taken_action}. The door was already open."
-#                         break
-#                     elif "I'm not sure what you mean." in brief_obs:
-#                         action_passed = False
-#                         large_loop_error_message = f"This is the action you take: {taken_action}. 'I'm not sure what you mean.'"
-#                         break
-
-#                     tem_memory += brief_obs
-
-#                     # If we exhausted the queue successfully, mark success
-#                     if not action_queue:
-#                         action_passed = True
-#                         overall_memory += tem_memory
-#                         successful_actions.extend(tem_action_queue)
-#                 # ---- End small loop ----
-
-
-#                 # End condition if we used up too many tries or found coin
-#                 if (within_step_tries == 5 and not action_passed) or end_game:
-#                     end_game = True
-#                     break
-#             # ---- End Large loop ----
-
-#             # After BOTH the small loop and large loop finish successfully, merge the new PF.
-#             if action_passed:
-#                 if pf_to_merge and pf:
-#                     print('**** merging old with new generated')
-#                     if merging_method == "llm":
-#                         merged_pf = merge_problem_files_llm(old_problem_file=pf_to_merge, new_problem_file=pf, model_name=model_name)
-#                     else:
-#                         merged_pf = merge_problem_files_code(pf_to_merge, pf)
-#                 else:
-#                     print('**** Directly using the first pf')
-#                     merged_pf = pf
-#                 pf_to_merge = merged_pf
-
-#             trial_record.append(trial_step_record)
-#             if end_game:
-#                 break
-
-#         # Log results to CSV at the end of each trial
-#         with open("output/merging_results.csv", "a", newline="") as csvfile:
-#             data_row = [
-#                 today,
-#                 model_name,
-#                 trial,
-#                 coin_found,
-#                 len(trial_record)-1 if trial_record else 0,
-#                 trial_record[-1] if trial_record else "No steps",
-#                 trial_record
-#             ]
-#             writer = csv.writer(csvfile)
-#             writer.writerow(data_row)
 
 def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=11, merging_method="llm"):
     """
@@ -1747,6 +1643,12 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
             writer = csv.writer(csvfile)
             writer.writerow(data_row)
 
+
+i = 0
+num_trials = 1
+folder_name = "3_0421_CC"
+result_name = folder_name
+
 ## Run baseline models
 # run_baseline_model("gpt-4o-mini-2024-07-18", 0, 2)
 # run_baseline_model("o3-mini-2025-01-31", 0, 10)
@@ -1755,6 +1657,7 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 
 ## Run PDDL generation models
+run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("o3-mini-2025-01-31", 0, 2) # gpt-4o; o3-mini
 # run_iterative_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 10, 10) # models--google--gemma-2-27b-it
 # run_iterative_model("google/gemma-2-27b-it", 6, 10)
@@ -1763,5 +1666,5 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 ## Run pf merging models
 
 # run_merging_pf_model("o3-mini-2025-01-31", 12, 13, merging_method="llm")
-run_merging_pf_model("gpt-4o-2024-05-13", 9, 11, merging_method="llm")
+# run_merging_pf_model("gpt-4o-2024-05-13", 9, 11, merging_method="llm")
 # run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")

@@ -99,9 +99,10 @@ df_metrics = pd.concat([df[["model_type", "model", "game_type", "goal_type"]], m
 
 # === Flexible group key setup ===
 # You can modify this as needed:
-group_keys = ["model_type", "model", "goal_type"]
+# group_keys = ["model_type", "model", "goal_type"]
 # group_keys = ["model_type", "model", "game_type", "goal_type"]
 # group_keys = ["model_type", "model", "game_type"]
+group_keys = ["model_type","game_type"]
 
 # Filter successes and failures
 df_success = df_metrics[df_metrics["succeed"] == 1]
