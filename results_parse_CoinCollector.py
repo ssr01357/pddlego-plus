@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import ast
 
 # Read CSV data
@@ -88,6 +89,24 @@ grouped = df_metrics.groupby(group_keys).agg(
 )
 
 # Merge in the average step metrics
+# Merge in the average step metrics
 result = grouped.join(avg_steps_success, how="left").join(avg_steps_failure, how="left").reset_index()
+
+# Add trial count
+trial_count = df_metrics.groupby(group_keys).size().rename("trial_count")
+
+# Merge into result
+result = result.join(trial_count, on=group_keys)
+
+# Set solver-related columns to NaN for baseline models
+baseline_mask = result["model_type"] == "baseline"
+result.loc[baseline_mask, ["total_solver_errors", "total_solver_fixed", "total_abort_solver"]] = np.nan
+
+# Convert selected count columns to integer type (preserving NaNs)
+int_cols = [
+    "succeed_count", "total_simulation_errors", "total_simulation_fixed",
+    "total_abort_simulation", "trial_count"
+]
+result[int_cols] = result[int_cols].astype("Int64")
 
 print(result)
