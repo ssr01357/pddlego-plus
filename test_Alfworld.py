@@ -31,110 +31,6 @@ from alfworld.agents.environment.alfred_tw_env import AlfredExpert, AlfredDemang
 
 from openai import OpenAI
 
-# def run_solver(domain_file, problem_file, solver):
-
-#     req_body = {"domain" : domain_file, "problem" : problem_file}
-
-#     # Send job request to solve endpoint
-#     solve_request_url=requests.post(f"https://solver.planning.domains:5001/package/{solver}/solve", json=req_body).json()
-
-#     # Query the result in the job
-#     celery_result=requests.post('https://solver.planning.domains:5001' + solve_request_url['result'])
-
-#     while celery_result.json().get("status","")== 'PENDING':
-#         # Query the result every 0.5 seconds while the job is executing
-#         celery_result=requests.post('https://solver.planning.domains:5001' + solve_request_url['result'])
-
-#     result = celery_result.json()['result']
-#     return result
-
-# df = """(define (domain exploration)
-#     (:requirements :strips :typing)
-#     (:types
-#         location
-#         direction
-#     )
-#     (:predicates
-#         (door-open ?loc1 ?loc2 ?dir)
-#         (visited ?loc)
-#         (at ?loc)
-#     )
-#     (:action open-door
-#     :parameters (?loc1 - location ?loc2 - location ?dir - direction)
-#     :precondition (and (at ?loc1) (not (door-open ?loc1 ?loc2 ?dir)))
-#     :effect (door-open ?loc1 ?loc2 ?dir)
-#     )
-
-#     (:action move
-#     :parameters (?from - location ?to - location ?dir - direction)
-#     :precondition (and (at ?from) (door-open ?from ?to ?dir))
-#     :effect (and (at ?to) (not (at ?from)) (visited ?to))
-# )"""
-
-# pf = """(define (problem exploration-problem)
-#     (:domain exploration)
-#     (:objects
-#         kitchen - location
-#         south-room - location
-#         west-room - location
-#         south - direction
-#         west - direction
-#     )
-#     (:init
-#         (at kitchen)
-#         (visited kitchen)
-#         (not (door-open kitchen south-room south))
-#         (not (door-open kitchen west-room west))
-#     )
-#     (:goal
-#         (at west-room)
-#     )
-# )"""
-
-# print(run_solver(df, pf, "dual-bfws-ffparser"))
-
-# =================================================================================================
-# import re
-
-# def map_actions(action):
-#     actions = action.lower().replace("(", "").replace(")", "").split('\n')
-#     action_lst = []
-#     for act in actions:
-#         if "gotolocation" in act: # '(GOTOLOCATION AGENT1 NEW_LOCATION TOWELHOLDER1)\n' => ['go to towelholder 1']
-#             location = act.split(' ')[-1]
-#             # Insert a space between non-digits and digits, e.g., "towelholder1" -> "towelholder 1"
-#             formatted_location = re.sub(r"(\D+)(\d+)", r"\1 \2", location)
-#             action_lst.append(f"go to {formatted_location}")
-#         elif "openobject" in act: # '(OPENOBJECT CABINET4)\n' => ['open cabinet 4']
-#             object_ = act.split(' ')[-1]
-#             formatted_object = re.sub(r"(\D+)(\d+)", r"\1 \2", object_)
-#             action_lst.append(f"open {formatted_object}")
-#         elif "pickupobject" in act:  # '(PICKUPOBJECT CLOTH1 CABINET4)' => ['take cloth 1 from cabinet 4']
-#             parts = act.split()
-#             # Expecting parts: ['pickupobject', 'cloth1', 'cabinet4']
-#             if len(parts) >= 3:
-#                 obj = parts[1]
-#                 container = parts[2]
-#                 formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
-#                 formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
-#                 action_lst.append(f"take {formatted_obj} from {formatted_container}")
-#         # elif : # '(PUTOBJECT CLOTH1 BATHTUBBASIN1)\n'  
-#         elif "putobject" in act:  # e.g., '(PUTOBJECT CLOTH1 BATHTUBBASIN1)' => ['put cloth 1 in/on bathtubbasin 1']
-#             parts = act.split()
-#             if len(parts) >= 3:
-#                 obj = parts[1]
-#                 container = parts[2]
-#                 formatted_obj = re.sub(r"(\D+)(\d+)", r"\1 \2", obj)
-#                 formatted_container = re.sub(r"(\D+)(\d+)", r"\1 \2", container)
-#                 action_lst.append(f"put {formatted_obj} in/on {formatted_container}")
-#     if len(action_lst) == 0:
-#         return None
-#     return action_lst
-
-# print(map_actions("(PUTOBJECT CLOTH1 BATHTUBBASIN1)\n"))
-
-# =================================================================================================
-### ========= Alfworld =========
 # choose a problem to solve
 problems = glob.glob(pjoin(ALFWORLD_DATA, "**", "initial_state.pddl"), recursive=True)
 
@@ -242,6 +138,6 @@ for action in actions:
     print('>', action)
     obs, reward, done, infos = env.step(action)
     print(obs)
-    # print(infos['admissible_commands'])
+    print(infos['admissible_commands'])
 
 print(infos['won'])
