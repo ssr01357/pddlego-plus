@@ -18,6 +18,32 @@ def analyze_game(row):
         return None
 
     num_steps = len(steps_list)
+
+    is_baseline = row["model_type"] == "baseline"
+
+    if is_baseline:
+        simulation_errors = 0
+        simulation_fixed = 0
+
+        for i, step in enumerate(steps_list):
+            # Step contains simulation error if any value ≠ 1
+            has_error = any(val != 1 for val in step)
+            if has_error:
+                simulation_errors += 1
+                if i < len(steps_list) - 1:
+                    simulation_fixed += 1
+
+        return {
+            "succeed": 1 if row["succeed"] else 0,
+            "steps": num_steps,
+            "solver_errors": np.nan,
+            "solver_fixed": np.nan,
+            "simulation_errors": simulation_errors,
+            "simulation_fixed": simulation_fixed,
+            "abort_solver": np.nan,
+            "abort_simulation": simulation_errors - simulation_fixed,
+        }
+        
     solver_errors = 0
     solver_fixed = 0
 

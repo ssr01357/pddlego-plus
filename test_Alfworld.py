@@ -144,7 +144,7 @@ if len(problems) == 0:
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
 
 
-problem = os.path.dirname(problems[7]) # select a specific problem to test
+problem = os.path.dirname(problems[1]) # select a specific problem to test
 print(f"Playing {problem}")
 
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
@@ -208,7 +208,7 @@ print(valid_actions)
 
 # == Problem 1: put a cloth in bathtubbasin. == Done
 # 'open shelf 1', 'examine shelf 1', 'open shelf 1', 'take cloth 1 from cabinet 4', 'go to bathtubbasin 1', 'examine bathtubbasin 1', 'move cloth 1 to bathtubbasin 1']
-
+actions = ['go to bathtubbasin 1', 'go to cabinet 1', 'open cabinet 1', 'go to cabinet 2', 'open cabinet 2', 'go to cabinet 3', 'open cabinet 3', 'go to cabinet 4'] 
 # == Problem 2: find two spraybottle and put them in toilet. ==
 
 # == Problem 3: put a hot slice of bread in fridge. ==
@@ -224,7 +224,7 @@ print(valid_actions)
 # actions = ['go to diningtable 1', 'take fork 1 from diningtable 1', 'go to sinkbasin 1', 'clean fork 1 with sinkbasin 1', 'go to countertop 1', 'move fork 1 to countertop 1']
 
 # == Problem 7: look at laptop under the desklamp. ==
-actions = ['go to desk 1', 'use desklamp 1', 'take laptop 1 from desk 1']
+# actions = ['go to desk 1', 'use desklamp 1', 'take laptop 1 from desk 1']
 
 # == Problem 8: put a remotecontrol in armchair. ==
 
