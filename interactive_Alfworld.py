@@ -2163,6 +2163,216 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     f.write(f"Trial {trial} (Attempt {retry+1}) failed: {str(e)}\n")
                 retry += 1
 
+def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
+    trial = 0
+    for game_type, game_lst in game_dictionary.items():
+        for problem_id in game_lst: # extra indent
+            trial += 1
+            retry = 0
+            while retry < 2:  # allow up to 2 attempts per trial
+                try:
+                    succeed = False
+                    today = date.today()
+                    fixed_model_name = model_name.replace("/", "_")
+                    folder_path = f"output/{folder_name}"
+                    os.makedirs(folder_path, exist_ok=True)
+                    file_name = f"{folder_path}/{today}_{fixed_model_name}_baseline_{trial}.txt"
+
+                    if retry == 1 and os.path.exists(file_name):
+                        open(file_name, 'w').close()  # empty file
+                        print(f"[Trial {trial}] Retrying: cleared file and retrying...")
+                    trial_record = []
+
+                    # each trial reset environment ===================
+                    problem = os.path.dirname(problems[problem_id])
+                    print(f"Playing {problem_id}: {problem}")
+                    domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
+                    grammar = pjoin(ALFWORLD_DATA, "logic", "alfred.twl2")
+                    GAME_LOGIC = {
+                            "pddl_domain": open(domain).read(),
+                            "grammar": open(grammar).read(),
+                        }
+                    pddl_file = os.path.join(problem, 'initial_state.pddl')
+                    json_file = os.path.join(problem, 'traj_data.json')
+                    with open(json_file, 'r') as f:
+                        traj_data = json.load(f)
+                    GAME_LOGIC['grammar'] = add_task_to_grammar(GAME_LOGIC['grammar'], traj_data)
+                    gamedata = dict(**GAME_LOGIC, pddl_problem=open(pddl_file).read())
+                    gamefile = os.path.join(os.path.dirname(pddl_file), 'game.tw-pddl')
+                    json.dump(gamedata, open(gamefile, "w"))
+                    expert = AlfredExpert(expert_type=AlfredExpertType.HANDCODED)
+
+                    request_infos = textworld.EnvInfos(
+                        won=True,
+                        admissible_commands=True,
+                        score=True,
+                        max_score=True,
+                        intermediate_reward=True,
+                        extras=["expert_plan"]
+                    )
+
+                    env_id = textworld.gym.register_game(
+                        gamefile,
+                        request_infos,
+                        max_episode_steps=1000000,
+                        wrappers=[AlfredDemangler(), expert]
+                    )
+                    env = textworld.gym.make(env_id)
+                    obs, infos = env.reset()
+                    init_obs = obs.split('\n')[2]
+                    goal = obs.split('\n')[-1]
+                    valid_actions = infos["admissible_commands"]
+                    valid_actions = sorted(set(valid_actions) - {'look', 'inventory', 'help'})
+
+                    with open(file_name, "a") as f:
+                        f.write(f"Trial {trial} - {model_name}\n")
+                        f.write(f"Initial Observation: {init_obs}\n")
+                        f.write(f"Goal: {goal}\n")
+                        f.write(f"Valid Actions: {valid_actions}\n")
+
+                    brief_obs = "Action: look around\n" + summarize_obs(init_obs) + "\n"
+                    overall_memory = brief_obs
+                    MAX_STEPS = 20
+                    all_actions = []
+                    successful_actions = []
+                    obs_queue = []
+
+                    for step_id in range(MAX_STEPS):
+                        with open(file_name, "a") as f:
+                            f.write(f"\n==== Step {step_id} ====\n")
+                        trial_step_record = []
+                        within_step_tries = 0
+                        action_passed = False
+                        large_loop_error_message = ""
+
+                        while within_step_tries < 5 and not action_passed:
+                            with open(file_name, "a") as f:
+                                f.write(f"\n---- Larger Loop No. {within_step_tries} ----\n")
+                                f.write(f"successful_actions: {successful_actions}\n")
+
+                            within_step_tries += 1
+
+                            if within_step_tries > 1:
+                                env_id = textworld.gym.register_game(
+                                    gamefile,
+                                    request_infos,
+                                    max_episode_steps=1000000,
+                                    wrappers=[AlfredDemangler(), expert]
+                                )
+                                env = textworld.gym.make(env_id)
+                                obs, infos = env.reset()
+                                for act in successful_actions:
+                                    obs, _, done, infos = env.step(act)
+
+                            actions, prompt = llm_to_actions_baseline(
+                                model_name,
+                                brief_obs,
+                                valid_actions,
+                                overall_memory,
+                                large_loop_error_message,
+                                goal_type=goal_type,
+                                goal=goal
+                            )
+
+                            with open(file_name, "a") as f:
+                                f.write(f"Prompt: {prompt}\n")
+                                f.write(f"Generated Actions: {actions}\n")
+
+                            if not actions:
+                                break
+
+                            action_queue = list(actions)
+                            tem_action_queue = []
+                            tem_memory = ""
+
+                            for act in action_queue:
+                                _ = action_queue.pop(0)
+                                obs, reward, done, infos = env.step(act)
+                                action_text = "Action: " + act + "\n"
+                                obs_text = summarize_obs(obs) + "\n"
+                                brief_obs = action_text + obs_text
+                                tem_memory += brief_obs
+                                all_actions.append(act)
+
+                                with open(file_name, "a") as f:
+                                    f.write(f"> {act}\n{brief_obs}\n")
+                                    f.write(f"After action '{act}', valid actions: {infos['admissible_commands']}\n")
+
+                                if infos["won"]:
+                                    succeed = True
+                                    action_passed = True
+                                    with open(file_name, "a") as f:
+                                        f.write("Success! Task completed.\n")
+                                    break
+
+                                taken_action = act
+                                if "Nothing happens." in brief_obs:
+                                    large_loop_error_message = f"""In this step, you take the following actions and observations from those actions:
+                                        {''.join(obs_queue)}"""
+                                    if "go to" in taken_action:
+                                        large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to go to a receptacle but nothing happens. 
+                                        You may already been at this receptacle, in other words, you have already went to this place and do not need to go to this receptacle again.
+                                        Otherwise, there is no the receptacle you are aiming to."""
+                                        continue
+                                    elif "open" in taken_action:
+                                        large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to open a receptacle but nothing happens. 
+                                        You should first go to this receptacle to open it. 
+                                        But if you have already go to this receptacle and still seeing this error message, it means that this receptacle cannot be opened and you can directly see objects after you go to it. Do not try to open it!!"""
+                                    elif "take" in taken_action:
+                                        large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to take something from a receptacle.
+                                        You should first go to this receptacle to take the object.
+                                        But if you have already go to this receptacle and still seeing this error message, it means that this receptacle doesn't have this object.
+                                        You should go to other receptacle to find your aim object. Remember do not assume you can take the object from the receptable but should always set the initial goal as finding that aim object."""
+                                    elif "move" in taken_action:
+                                        large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}.
+                                        You want to move some object to a receptacle but failed. You should first find that object somewhere by going to an unvisited receptacle and open if necessary.
+                                        Then pick up the aiming object so that you can go to your aim receptacle and put it there.
+                                        """
+                                    elif "slice" in taken_action:
+                                        large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to slice an object with a sharp object.
+                                        You should first pickup the sharp object (this should be the only object you pick up) then take the slice action directly without picking up the aim object!
+                                        Don't forget to put the sharp object back to the receptacle after you finish slicing."""
+                                    elif "cool" in taken_action:
+                                        large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to cool an object with a fridge. 
+                                        You need to find the object and pick it up from other receptacle. Then go to frige and cool the object directly. Notice: do not move the object to the fridge but cool directly!"""
+                                    elif ("fridge" in taken_action or "sinkbasin" in taken_action or "microwave" in taken_action) and ("move" in taken_action or "take" in taken_action): # pass this
+                                        large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to move or take an object to or from a fridge. 
+                                        You don't need to take this action! You should go to fridge receptacle, cool the object, go to another receptacle"""
+                                        continue
+                                    elif "use" in taken_action:
+                                        large_loop_error_message += f"""This is the action you take and got something wrong: {taken_action}. You are trying to use an object.
+                                        You can only use a lamp to turn it on and look at or examine other objects. Note: to look at or examine other objects, you should first pick it up."""
+                                    break
+
+                                if not action_queue:
+                                    action_passed = True
+                                    successful_actions.extend(tem_action_queue)
+                                    overall_memory += tem_memory
+                            # if action_passed:
+                            #     successful_actions.extend(actions)
+                            #     overall_memory += tem_memory
+                            #     break
+
+                        trial_step_record.append(within_step_tries)
+                        trial_record.append(trial_step_record)
+
+                        if within_step_tries == 5 or succeed:
+                            break
+
+                    with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
+                        writer = csv.writer(csvfile)
+                        model_type = 'baseline' # PDDL
+                        data_row = [today, model_name, model_type, game_type, goal_type, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
+                        writer.writerow(data_row)
+
+                    break
+
+                except Exception as e:
+                    error_log_path = f"output/{folder_name}/errors.txt"
+                    with open(error_log_path, "a") as f:
+                        f.write(f"Trial {trial} (Attempt {retry+1}) failed: {str(e)}\n")
+                    retry += 1
+
 
 
 
