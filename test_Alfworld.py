@@ -39,10 +39,12 @@ if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
 # problem = os.path.dirname(random.choice(problems)) # random select one problem
 
+# for i in range(100, 200):
+#     problem = os.path.dirname(problems[i]) # select a specific problem to test
+#     problem = problem.replace('/Users/krystalgong/.cache/alfworld/json_2.1.1/valid_seen/', '')
+#     print(f"{i}: {problem}")
 
-problem = os.path.dirname(problems[1]) # select a specific problem to test
-print(f"Playing {problem}")
-
+problem = os.path.dirname(problems[3]) # select a specific problem to test
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
 grammar = pjoin(ALFWORLD_DATA, "logic", "alfred.twl2")
 
@@ -104,12 +106,12 @@ print(valid_actions)
 
 # == Problem 1: put a cloth in bathtubbasin. == Done
 # 'open shelf 1', 'examine shelf 1', 'open shelf 1', 'take cloth 1 from cabinet 4', 'go to bathtubbasin 1', 'examine bathtubbasin 1', 'move cloth 1 to bathtubbasin 1']
-actions = ['go to bathtubbasin 1', 'go to cabinet 1', 'open cabinet 1', 'go to cabinet 2', 'open cabinet 2', 'go to cabinet 3', 'open cabinet 3', 'go to cabinet 4'] 
+# actions = ['go to bathtubbasin 1', 'go to cabinet 1', 'open cabinet 1', 'go to cabinet 2', 'open cabinet 2', 'go to cabinet 3', 'open cabinet 3', 'go to cabinet 4'] 
 # == Problem 2: find two spraybottle and put them in toilet. ==
 
 # == Problem 3: put a hot slice of bread in fridge. ==
-# actions = ['go to countertop 1', 'take knife 1 from countertop 1', 'slice bread 1 with knife 1', 'move knife 1 to countertop 1', 'take bread 1 from countertop 1', \
-#            'go to microwave 1', 'open microwave 1', 'heat bread 1 with microwave 1', '(move bread 1 to microwave 1)', '(take bread 1 from microwave 1)', 'go to fridge 1','open fridge 1', 'move bread 1 to fridge 1']
+actions = ['go to countertop 1', 'take knife 1 from countertop 1', 'slice bread 1 with knife 1', 'move knife 1 to countertop 1', 'take bread 1 from countertop 1', \
+           'go to microwave 1', 'open microwave 1', 'heat bread 1 with microwave 1', '(move bread 1 to microwave 1)', '(take bread 1 from microwave 1)', 'go to fridge 1','open fridge 1', 'move bread 1 to fridge 1']
 
 # == Problem 4: put a hot potato in fridge. ==
 
