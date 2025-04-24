@@ -3,8 +3,12 @@ import numpy as np
 import ast
 
 # Read CSV data
+# df = pd.read_csv("output/3_0421_CC.csv", header=None, 
+#                  names=["date", "model", "model_type", "goal_type", "game_id", "succeed", 
+#                         "final_step_index", "last_attempt_str", "steps_str"])
+
 df = pd.read_csv("output/3_0421_CC.csv", header=None, 
-                 names=["date", "model", "model_type", "goal_type", "game_id", "succeed", 
+                 names=["date", "model", "model_type", "num_location", "goal_type", "game_id", "succeed", 
                         "final_step_index", "last_attempt_str", "steps_str"])
 
 # Convert succeed column to Boolean
@@ -43,7 +47,7 @@ def analyze_game(row):
             "abort_solver": np.nan,
             "abort_simulation": simulation_errors - simulation_fixed,
         }
-        
+
     solver_errors = 0
     solver_fixed = 0
 
@@ -93,7 +97,8 @@ df_metrics = pd.concat([df[["model_type", "model", "goal_type"]], metrics_df], a
 # === Flexible group key setup ===
 # You can modify this as needed:
 # group_keys = ["model_type", "model", "goal_type"]
-group_keys = ["model_type", "model", "goal_type"]  # for more granularity
+group_keys = ["model_type", "model", "goal_type", "num_location"]
+# group_keys = ["model_type", "model", "goal_type"]
 
 # Filter successes and failures
 df_success = df_metrics[df_metrics["succeed"] == 1]
@@ -114,7 +119,6 @@ grouped = df_metrics.groupby(group_keys).agg(
     total_abort_simulation=("abort_simulation", "sum")
 )
 
-# Merge in the average step metrics
 # Merge in the average step metrics
 result = grouped.join(avg_steps_success, how="left").join(avg_steps_failure, how="left").reset_index()
 
