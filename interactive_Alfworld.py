@@ -801,11 +801,11 @@ problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'he
 game_type = problem_type_dic[problem_id] # set game_type here!
 
 game_dictionary = {
-    "basic&use": [1,8,23,21,30,5,7,15,20,22],
+    "basic&use": [1,8,23,21,30,5,7,27,20,22],
     "cool": [9,13,18,25,42,44,46,50,58,68],
     "heat": [4,60,69,71,93,104,119,151,153,154],
     "clean": [0,6,10,37,38,52,61,79,80,83],
-    "slice+": [29,39,48,3,17,34,49,73,19,64]
+    "slice+": [29,39,56,3,17,34,49,73,19,64]
 }
 
 print(f"Playing {problem}")
@@ -1648,7 +1648,7 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     f.write(f"Trial {trial} (Attempt {retry+1}) model ({model_name}) failed: {str(e)}\n")
                 retry += 1
 
-def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
+def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed", trials_to_run=None):
     # trial_record = 
     # structured_info_record = "output/summary"
     # for trial in range(start_trial, end_trial):
@@ -1656,6 +1656,10 @@ def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-7
     for game_type, game_lst in game_dictionary.items():
         for problem_id in game_lst: # extra indent
             trial += 1
+
+            if trials_to_run and trial not in trials_to_run: # skip trials not in the list
+                continue
+
             retry = 0
             while retry < 2:  # allow up to 2 attempts per trial
                 try:
@@ -2396,7 +2400,7 @@ result_name = folder_name
 # run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
-run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed", trials_to_run=[8,43])
 
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")

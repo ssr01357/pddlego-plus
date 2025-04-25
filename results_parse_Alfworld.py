@@ -3,7 +3,7 @@ import numpy as np
 import ast
 
 # Read CSV data
-df = pd.read_csv("output/2_0419_Alfworld.csv", header=None, 
+df = pd.read_csv("output/4_0424_Alfworld_50_fixed.csv", header=None, 
                  names=["date", "model", "model_type", "game_type", "goal_type", "game_id", "succeed", 
                         "final_step_index", "last_attempt_str", "steps_str"])
 
@@ -101,8 +101,8 @@ df_metrics = pd.concat([df[["model_type", "model", "game_type", "goal_type"]], m
 # You can modify this as needed:
 # group_keys = ["model_type", "model", "goal_type"]
 # group_keys = ["model_type", "model", "game_type", "goal_type"]
-# group_keys = ["model_type", "model", "game_type"]
-group_keys = ["model_type","game_type"]
+group_keys = ["model_type", "model", "game_type"]
+# group_keys = ["model_type","game_type"]
 
 # Filter successes and failures
 df_success = df_metrics[df_metrics["succeed"] == 1]

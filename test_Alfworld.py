@@ -44,7 +44,7 @@ if len(problems) == 0:
 #     problem = problem.replace('/Users/krystalgong/.cache/alfworld/json_2.1.1/valid_seen/', '')
 #     print(f"{i}: {problem}")
 
-problem = os.path.dirname(problems[3]) # select a specific problem to test
+problem = os.path.dirname(problems[56]) # select a specific problem to test
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
 grammar = pjoin(ALFWORLD_DATA, "logic", "alfred.twl2")
 
@@ -131,15 +131,15 @@ actions = ['go to countertop 1', 'take knife 1 from countertop 1', 'slice bread 
 # actions = ['go to diningtable 1', 'take winebottle 1 from diningtable 1', 'go to fridge 1', 'move winebottle 1 to fridge 1 (Nothing happens.)', 'cool winebottle 1 with fridge 1','take winebottle 1 from fridge 1 (Nothing happens.)', 'go to diningtable 1', 'move winebottle 1 to diningtable 1']
 
 
-problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
-     5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}
+# problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
+#      5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}
 
-# actions = ['go to']
+# # actions = ['go to']
 
-for action in actions:
-    print('>', action)
-    obs, reward, done, infos = env.step(action)
-    print(obs)
-    print(infos['admissible_commands'])
+# for action in actions:
+#     print('>', action)
+#     obs, reward, done, infos = env.step(action)
+#     print(obs)
+#     print(infos['admissible_commands'])
 
-print(infos['won'])
+# print(infos['won'])
