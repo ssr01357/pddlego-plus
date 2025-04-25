@@ -1205,7 +1205,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
 
                             obs_queue.append(brief_obs)
                             with open(file_name, "a") as f:
-                                f.write(f"> {taken_action} \n {brief_obs} \n")
+                                f.write(f"> {taken_action} \n {obs} \n")
 
                             # Define action passed
                             if "You can't move there, the door is closed." in brief_obs:
@@ -1450,7 +1450,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
 
                                 obs_queue.append(brief_obs)
                                 with open(file_name, "a") as f:
-                                    f.write(f"> {taken_action} \n {brief_obs} \n")
+                                    f.write(f"> {taken_action} \n {obs} \n")
 
                                 # Define action passed
                                 if "You can't move there, the door is closed." in brief_obs:
@@ -1632,7 +1632,7 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
                             brief_obs = action_text + obs_text
                             obs_queue.append(brief_obs)
                             with open(file_name, "a") as f:
-                                f.write(f"> {taken_action} \n {brief_obs} \n")
+                                f.write(f"> {taken_action} \n {obs} \n")
 
                             # Check for common errors in the observation and update the error message.
                             if "You can't move there, the door is closed." in brief_obs:
@@ -1827,7 +1827,7 @@ def run_baseline_model_50(model_name, start_trials, end_trials, folder_name="08_
                                 brief_obs = action_text + obs_text
                                 obs_queue.append(brief_obs)
                                 with open(file_name, "a") as f:
-                                    f.write(f"> {taken_action} \n {brief_obs} \n")
+                                    f.write(f"> {taken_action} \n {obs} \n")
 
                                 # Check for common errors in the observation and update the error message.
                                 if "You can't move there, the door is closed." in brief_obs:
