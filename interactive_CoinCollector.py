@@ -1266,7 +1266,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
 
 def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
     trial = 0
-    for NUM_LOCATIONS in [3,5,7,9,11]:
+    for NUM_LOCATIONS in [5,7,9]: # [3,5,7,9,11]
         for seed_num in range(1,11):
             trial += 1
             retry = 0
@@ -1341,7 +1341,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
                             if within_step_tries > 1: # second or third ... time in the larger loop
                                 # reset env by refilling successful actions (stupid but useful)
                                 env = TextWorldExpressEnv(envStepLimit=100)
-                                NUM_LOCATIONS = 11
+                                # NUM_LOCATIONS = 11
                                 env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
                                 obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
                                 for successful_action in successful_actions:
@@ -1773,7 +1773,6 @@ def run_baseline_model_50(model_name, start_trials, end_trials, folder_name="08_
 
                             if within_step_tries > 1:  # For subsequent tries, reset the environment
                                 env = TextWorldExpressEnv(envStepLimit=100)
-                                NUM_LOCATIONS = 11
                                 env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
                                 obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
                                 for act in successful_actions:
@@ -2111,13 +2110,13 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 i = 0
 num_trials = 10
-folder_name = "3_0421_CC"
+folder_name = "5_0425_CC_50_fixed"
 result_name = folder_name
 
 # run_iterative_model("gpt-4.1-2025-04-14", 0, 1, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## Run baseline models
-run_baseline_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name)
+# run_baseline_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name)
@@ -2131,6 +2130,7 @@ run_baseline_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name
 # run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
+run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## Run pf merging models
 

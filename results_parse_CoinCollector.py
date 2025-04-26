@@ -7,7 +7,7 @@ import ast
 #                  names=["date", "model", "model_type", "goal_type", "game_id", "succeed", 
 #                         "final_step_index", "last_attempt_str", "steps_str"])
 
-df = pd.read_csv("output/3_0421_CC.csv", header=None, 
+df = pd.read_csv("output/5_0425_CC_50_fixed.csv", header=None, 
                  names=["date", "model", "model_type", "num_location", "goal_type", "game_id", "succeed", 
                         "final_step_index", "last_attempt_str", "steps_str"])
 
@@ -92,7 +92,7 @@ metrics = df.apply(analyze_game, axis=1)
 metrics_df = pd.DataFrame(metrics.tolist())
 
 # Combine metrics with identifiers (include model_type now)
-df_metrics = pd.concat([df[["model_type", "model", "goal_type"]], metrics_df], axis=1)
+df_metrics = pd.concat([df[["model_type", "model", "goal_type", "num_location"]], metrics_df], axis=1)
 
 # === Flexible group key setup ===
 # You can modify this as needed:

@@ -1664,7 +1664,7 @@ def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-7
             while retry < 2:  # allow up to 2 attempts per trial
                 try:
                     succeed = False
-                    today = "2025-04-24" #date.today()
+                    today = "2025-04-25" #date.today()
                     fixed_model_name = model_name.replace("/","_")
                     folder_path = f"output/{folder_name}"
                     if not os.path.exists(folder_path):
@@ -1678,11 +1678,6 @@ def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-7
                     trial_record = []
                     
                     # each trial reset environment ===================
-                    # problem_id = random.randint(0, 9)
-                    
-                    # problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
-                    #     5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}
-                    # game_type = problem_type_dic[problem_id] # set game_type here!
                     problem = os.path.dirname(problems[problem_id])
                     print(f"Playing {problem_id}: {problem}")
                     domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
@@ -2400,7 +2395,8 @@ result_name = folder_name
 # run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
-run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed", trials_to_run=[8,43])
+# run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed", trials_to_run=[8,43])
+run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")

@@ -37,13 +37,13 @@ problems = glob.glob(pjoin(ALFWORLD_DATA, "**", "initial_state.pddl"), recursive
 problems = [p for p in problems if "movable_recep" not in p]
 if len(problems) == 0:
     raise ValueError(f"Can't find problem files in {ALFWORLD_DATA}. Did you run alfworld-data?")
-# problem = os.path.dirname(random.choice(problems)) # random select one problem
 
 # for i in range(100, 200):
 #     problem = os.path.dirname(problems[i]) # select a specific problem to test
 #     problem = problem.replace('/Users/krystalgong/.cache/alfworld/json_2.1.1/valid_seen/', '')
 #     print(f"{i}: {problem}")
 
+# problem = os.path.dirname(random.choice(problems)) # random select one problem
 problem = os.path.dirname(problems[56]) # select a specific problem to test
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
 grammar = pjoin(ALFWORLD_DATA, "logic", "alfred.twl2")
@@ -95,12 +95,8 @@ valid_actions.remove('help')
 # print(infos)
 print(goal)
 print(init_obs)
-# print(infos)
 print(obs)
 print(valid_actions)
-# brief_obs = "Action: look around\n" + init_obs+'\n'
-
-# cabinets = [f'cabinet {i}' for i in range(1,22)]
 
 # == Problem 0: put a clean ladle in countertop. ==
 
@@ -110,8 +106,8 @@ print(valid_actions)
 # == Problem 2: find two spraybottle and put them in toilet. ==
 
 # == Problem 3: put a hot slice of bread in fridge. ==
-actions = ['go to countertop 1', 'take knife 1 from countertop 1', 'slice bread 1 with knife 1', 'move knife 1 to countertop 1', 'take bread 1 from countertop 1', \
-           'go to microwave 1', 'open microwave 1', 'heat bread 1 with microwave 1', '(move bread 1 to microwave 1)', '(take bread 1 from microwave 1)', 'go to fridge 1','open fridge 1', 'move bread 1 to fridge 1']
+# actions = ['go to countertop 1', 'take knife 1 from countertop 1', 'slice bread 1 with knife 1', 'move knife 1 to countertop 1', 'take bread 1 from countertop 1', \
+#            'go to microwave 1', 'open microwave 1', 'heat bread 1 with microwave 1', '(move bread 1 to microwave 1)', '(take bread 1 from microwave 1)', 'go to fridge 1','open fridge 1', 'move bread 1 to fridge 1']
 
 # == Problem 4: put a hot potato in fridge. ==
 
@@ -131,15 +127,15 @@ actions = ['go to countertop 1', 'take knife 1 from countertop 1', 'slice bread 
 # actions = ['go to diningtable 1', 'take winebottle 1 from diningtable 1', 'go to fridge 1', 'move winebottle 1 to fridge 1 (Nothing happens.)', 'cool winebottle 1 with fridge 1','take winebottle 1 from fridge 1 (Nothing happens.)', 'go to diningtable 1', 'move winebottle 1 to diningtable 1']
 
 
-# problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
-#      5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}
+problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
+     5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}
 
-# # actions = ['go to']
+actions = ['go to']
 
-# for action in actions:
-#     print('>', action)
-#     obs, reward, done, infos = env.step(action)
-#     print(obs)
-#     print(infos['admissible_commands'])
+for action in actions:
+    print('>', action)
+    obs, reward, done, infos = env.step(action)
+    print(obs)
+    print(infos['admissible_commands'])
 
-# print(infos['won'])
+print(infos['won'])
