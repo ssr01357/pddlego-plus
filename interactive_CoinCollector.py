@@ -341,28 +341,6 @@ def run_gpt_for_actions_baseline(prompt, model_name):
 
         return actions
 
-def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None):
-    prompt = f"""
-        You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
-        Here are your current observations: {brief_obs}
-        Here are some valid actions you can take: {valid_actions}
-        Your goal is to explore new locations and interact with the environment effectively. Ensure actions are logical and do not repeat unnecessarily.
-
-        Additional context:
-        {overall_memory if overall_memory else "No additional memory available."}
-
-        If there are errors or obstacles, here is the message:
-        {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
-
-        Provide the output in strict JSON format like this:
-        {{
-            "actions": ["action1", "action2", ...]
-        }}
-    """
-    actions = run_gpt_for_actions_baseline(prompt, model_name)
-    return actions
-
-
 # VAL setup
 # common_path = "/Users/krystalgong/Documents/GitHub/pddlego-df/"
 
@@ -906,6 +884,29 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     return df, pf, err, prompt
 
 
+def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None):
+    prompt = f"""
+        You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
+        Here are your current observations: {brief_obs}
+        Here are some valid actions you can take: {valid_actions}
+        Your goal is to explore new locations and interact with the environment effectively. Ensure actions are logical and do not repeat unnecessarily.
+
+        Additional context:
+        {overall_memory if overall_memory else "No additional memory available."}
+
+        If there are errors or obstacles, here is the message:
+        {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
+
+        Provide the output in strict JSON format like this while you should only generate one action at a time:
+        {{
+            "actions": ["action1"]
+        }}
+    """
+    actions = run_gpt_for_actions_baseline(prompt, model_name)
+    return actions
+
+
+
 # ==== Merging method helper functions ====
 # Merging method: Without previous problem file but only feeding observations
 def generate_problem_file_from_observation(observation, model_name="o3-mini", domain_file="", err="", err_2=""):
@@ -1265,15 +1266,15 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                 retry += 1
 
 def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
-    trial = 0
-    for NUM_LOCATIONS in [5,7,9]: # [3,5,7,9,11]
-        for seed_num in range(1,11):
+    trial = 6
+    for NUM_LOCATIONS in [9]: # [3,5,7,9,11]
+        for seed_num in range(7,11):
             trial += 1
             retry = 0
             while retry < 2:  # allow up to 2 attempts per trial
                 try:
                     coin_found = False
-                    today = date.today()
+                    today = "2025-04-29"#date.today()
 
                     fixed_model_name = model_name.replace("/","_")
 
@@ -1281,7 +1282,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
                     if not os.path.exists(folder_path):
                         os.makedirs(folder_path)
 
-                    file_name = f"{folder_path}/{today}_{fixed_model_name}_PDDL_{goal_type}_{trial}.txt"
+                    file_name = f"{folder_path}/{today}_{fixed_model_name}_PDDL_{goal_type}_{NUM_LOCATIONS}_{trial}.txt"
                     
                     if os.path.exists(file_name): # retry == 1 and 
                         open(file_name, 'w').close()  # empty file
@@ -2130,7 +2131,8 @@ result_name = folder_name
 # run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
-run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## Run pf merging models
 

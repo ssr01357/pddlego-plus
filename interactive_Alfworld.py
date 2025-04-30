@@ -2167,6 +2167,8 @@ def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-7
     for game_type, game_lst in game_dictionary.items():
         for problem_id in game_lst: # extra indent
             trial += 1
+            if trial < 13 and model_name == "o3-mini-2025-01-31":
+                continue
             retry = 0
             while retry < 2:  # allow up to 2 attempts per trial
                 try:
@@ -2396,7 +2398,9 @@ result_name = folder_name
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed", trials_to_run=[8,43])
-run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
