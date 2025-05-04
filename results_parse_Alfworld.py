@@ -144,5 +144,5 @@ int_cols = [
 result[int_cols] = result[int_cols].astype("Int64")
 
 print(result)
-
+# result.to_csv("output/4_0424_Alfworld_50_fixed_summary.csv", index=False)
 # print(result)

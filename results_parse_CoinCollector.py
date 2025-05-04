@@ -7,7 +7,7 @@ import ast
 #                  names=["date", "model", "model_type", "goal_type", "game_id", "succeed", 
 #                         "final_step_index", "last_attempt_str", "steps_str"])
 
-df = pd.read_csv("output/5_0425_CC_50_fixed.csv", header=None, 
+df = pd.read_csv("output/6_0430_CC_50_fixed.csv", header=None, 
                  names=["date", "model", "model_type", "num_location", "goal_type", "game_id", "succeed", 
                         "final_step_index", "last_attempt_str", "steps_str"])
 

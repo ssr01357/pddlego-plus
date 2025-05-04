@@ -1262,16 +1262,16 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                 retry += 1
 
 def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
-    if model_name == 'o3-mini-2025-01-31':
-        seed_range_start = 11
-        seed_range_end = 21
-        trial = 50
-    else:
-        seed_range_start = 0
-        seed_range_end = 20
-        trial = 0
+    # if model_name == 'o3-mini-2025-01-31':
+    #     seed_range_start = 11
+    #     seed_range_end = 21
+    #     trial = 50
+    # else:
+    #     seed_range_start = 0
+    #     seed_range_end = 20
+    trial = 0
     for NUM_LOCATIONS in [3,5,7,9,11]: # [3,5,7,9,11]
-        for seed_num in range(seed_range_start, seed_range_end):
+        for seed_num in range(0, 20):
             trial += 1
             retry = 0
             while retry < 2:  # allow up to 2 attempts per trial
@@ -2113,7 +2113,7 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 i = 0
 num_trials = 10
-folder_name = "6_0430_CC_50_fixed"
+folder_name = "8_0503_CC_tem_subgoal"
 result_name = folder_name
 
 # run_iterative_model("gpt-4.1-2025-04-14", 0, 1, folder_name=folder_name, result_name=result_name, goal_type="detailed")
@@ -2124,9 +2124,10 @@ result_name = folder_name
 # run_baseline_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name)
-run_baseline_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name)
-run_baseline_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name)
-run_baseline_model_50("deepseek", folder_name=folder_name, result_name=result_name)
+
+# run_baseline_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name)
+# run_baseline_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name)
+# run_baseline_model_50("deepseek", folder_name=folder_name, result_name=result_name)
 
 
 ## Run PDDL generation models
@@ -2141,9 +2142,9 @@ run_baseline_model_50("deepseek", folder_name=folder_name, result_name=result_na
 # run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## RUN next!!!
-# run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-# run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-# run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 
 ## Run pf merging models
  
