@@ -1014,13 +1014,11 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
             Goal 2.2: Move to the appropriate location needed to fulfill the task.
             Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
 
-        In summary, the first stage is all about finding the object—this might involve going to an unvisited receptacle and opening it if necessary.
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
         
-        Note: 
-        1. some receptacles have numbers in their names. Always keep them as they are. For example, "towelholder1" should not be changed to "towelholder".
-        2. Your initial goal should always be to go to a new location instead of put something into somewhere.
-        3. Do not enter stage 2 when not finishing stage 1.
-
         Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
     """ 
 
@@ -1665,6 +1663,8 @@ def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-7
         game_lst_sep = game_lst*2
         for problem_id in game_lst_sep: # extra indent
             trial += 1
+            if trial < 41 or trial > 60: #[41,60]
+                continue
 
             if trials_to_run and trial not in trials_to_run: # skip trials not in the list
                 continue
@@ -1673,7 +1673,7 @@ def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-7
             while retry < 2:  # allow up to 2 attempts per trial
                 try:
                     succeed = False
-                    today = "2025-05-04" #date.today()
+                    today = "2025-05-05" #date.today()
                     fixed_model_name = model_name.replace("/","_")
                     folder_path = f"output/{folder_name}"
                     if not os.path.exists(folder_path):
@@ -2418,13 +2418,13 @@ result_name = folder_name
 # run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
-run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-
 # run_baseline_alfworld_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_baseline_alfworld_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_baseline_alfworld_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+
+# run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")

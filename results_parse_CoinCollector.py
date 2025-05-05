@@ -139,4 +139,6 @@ int_cols = [
 ]
 result[int_cols] = result[int_cols].astype("Int64")
 
-print(result)
+# print(result)
+result.to_csv("output/6_0430_CC_50_fixed_summary.csv", index=False)
+# print(result)

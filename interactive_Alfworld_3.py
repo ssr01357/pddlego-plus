@@ -1663,7 +1663,7 @@ def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-7
         game_lst_sep = game_lst*2
         for problem_id in game_lst_sep: # extra indent
             trial += 1
-            if trial < 27 or trial > 40: #[27,40]
+            if trial < 61 or trial > 80: #[61,80]
                 continue
 
             if trials_to_run and trial not in trials_to_run: # skip trials not in the list

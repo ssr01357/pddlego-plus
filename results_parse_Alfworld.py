@@ -101,7 +101,7 @@ df_metrics = pd.concat([df[["model_type", "model", "game_type", "goal_type"]], m
 # You can modify this as needed:
 # group_keys = ["model_type", "model", "goal_type"]
 # group_keys = ["model_type", "model", "game_type", "goal_type"]
-group_keys = ["model_type", "model", "game_type"]
+group_keys = ["model_type", "model", "goal_type", "game_type"]
 # group_keys = ["model_type","game_type"]
 
 # Filter successes and failures
@@ -144,5 +144,5 @@ int_cols = [
 result[int_cols] = result[int_cols].astype("Int64")
 
 print(result)
-# result.to_csv("output/4_0424_Alfworld_50_fixed_summary.csv", index=False)
+result.to_csv("output/4_0424_Alfworld_50_fixed_summary.csv", index=False)
 # print(result)
