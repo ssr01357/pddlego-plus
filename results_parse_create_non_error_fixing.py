@@ -2,7 +2,7 @@ import pandas as pd
 import ast
 
 # 1. Read your results file
-file_name = "6_0430_CC_50_fixed"  # 4_0424_Alfworld_50_fixed, 6_0430_CC_50_fixed
+file_name = "4_0424_Alfworld_50_fixed"  # 4_0424_Alfworld_50_fixed, 6_0430_CC_50_fixed
 df = pd.read_csv(
     f"output/{file_name}.csv", 
     header=None,
@@ -82,7 +82,7 @@ df["pure_first_time_success"] = df.apply(
 )
 
 # 5. Save to a new CSV
-output_path = f"output/{file_name}_non_error_fixing_first_time_success.csv"
+output_path = f"output/{file_name}_non_error_fixing.csv"
 df.to_csv(output_path, index=False)
 
 print(f"Saved first-time success summary to {output_path}")
