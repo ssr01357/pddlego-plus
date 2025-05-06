@@ -3,7 +3,7 @@ import numpy as np
 import ast
 
 # 0. File setup
-file_name = "6_0430_CC_50_fixed_non_error_fixing_first_time_success" # 4_0424_Alfworld_50_fixed_non_error_fixing, 6_0430_CC_50_fixed_non_error_fixing_first_time_success
+file_name = "6_0430_CC_no_error_fixing" # 4_0424_Alfworld_50_fixed_non_error_fixing, 6_0430_CC_50_fixed_non_error_fixing_first_time_success
 input_path = f"output/{file_name}.csv"
 output_path = f"output/{file_name}_summary.csv"
 

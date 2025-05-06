@@ -7,7 +7,8 @@ import ast
 #                  names=["date", "model", "model_type", "goal_type", "game_id", "succeed", 
 #                         "final_step_index", "last_attempt_str", "steps_str"])
 
-df = pd.read_csv("output/6_0430_CC_50_fixed.csv", header=None, 
+file_name = "6_0430_CC"
+df = pd.read_csv(f"output/{file_name}.csv", header=None, 
                  names=["date", "model", "model_type", "num_location", "goal_type", "game_id", "succeed", 
                         "final_step_index", "last_attempt_str", "steps_str"])
 
@@ -140,5 +141,5 @@ int_cols = [
 result[int_cols] = result[int_cols].astype("Int64")
 
 # print(result)
-result.to_csv("output/6_0430_CC_50_fixed_summary.csv", index=False)
+result.to_csv(f"output/{file_name}_summary.csv", index=False)
 # print(result)

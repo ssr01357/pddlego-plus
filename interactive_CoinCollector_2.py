@@ -1273,11 +1273,13 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
     for NUM_LOCATIONS in [3,5,7,9,11]: # [3,5,7,9,11]
         for seed_num in range(0, 20):
             trial += 1
+            if trial < 4 or trial > 4:
+                continue
             retry = 0
             while retry < 2:  # allow up to 2 attempts per trial
                 try:
                     coin_found = False
-                    today = date.today()
+                    today = "2025-05-05"#date.today()
 
                     fixed_model_name = model_name.replace("/","_")
 
@@ -2111,9 +2113,9 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
             writer.writerow(data_row)
 
 
-i = 0
-num_trials = 10
-folder_name = "8_0503_CC_tem_subgoal"
+# i = 0
+# num_trials = 10
+folder_name = "6_0430_CC_50_fixed"
 result_name = folder_name
 
 # run_iterative_model("gpt-4.1-2025-04-14", 0, 1, folder_name=folder_name, result_name=result_name, goal_type="detailed")
@@ -2142,9 +2144,13 @@ result_name = folder_name
 # run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 ## RUN next!!!
-run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+
+run_iterative_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name)
+# run_iterative_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 
 ## Run pf merging models
  

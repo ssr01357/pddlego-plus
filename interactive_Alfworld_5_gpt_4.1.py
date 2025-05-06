@@ -1663,8 +1663,8 @@ def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-7
         game_lst_sep = game_lst*2
         for problem_id in game_lst_sep: # extra indent
             trial += 1
-            if trial < 61 or trial > 80: #[61,80]
-                continue
+            # if trial < 81: #[81,100]
+            #     continue
 
             if trials_to_run and trial not in trials_to_run: # skip trials not in the list
                 continue
@@ -2172,15 +2172,15 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 retry += 1
 
 def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
-    if model_name in ["o3-mini-2025-01-31", "deepseek"]:
-        trial = 50
-    else:
-        trial = 0
+    # if model_name in ["o3-mini-2025-01-31", "deepseek"]:
+    #     trial = 50
+    # else:
+    trial = 0
     for game_type, game_lst in game_dictionary.items():
-        if model_name in ["o3-mini-2025-01-31", "deepseek"]:
-            game_lst_sep = game_lst
-        else:
-            game_lst_sep = game_lst*2
+        # if model_name in ["o3-mini-2025-01-31", "deepseek"]:
+        #     game_lst_sep = game_lst
+        # else:
+        game_lst_sep = game_lst*2
         for problem_id in game_lst_sep:
         # for problem_id in game_lst: # extra indent
             trial += 1
@@ -2394,9 +2394,9 @@ def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-7
 
 
 
-i = 0
-num_trials = 10
-folder_name = "7_0503_Alfworld_tem_subgoal"
+# i = 0
+# num_trials = 10
+folder_name = "4_0424_Alfworld_50_fixed"
 result_name = folder_name
 
 ## Run baseline models
@@ -2417,14 +2417,17 @@ result_name = folder_name
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 # run_baseline_alfworld_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_baseline_alfworld_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_baseline_alfworld_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+run_iterative_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
