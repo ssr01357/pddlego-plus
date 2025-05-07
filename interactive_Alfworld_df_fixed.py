@@ -2113,7 +2113,7 @@ def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-7
                     retry += 1
 
 
-def run_iterative_model_fixed(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed", trials_to_run=None):
+def run_iterative_model_fixed_df(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed", trials_to_run=None):
     trial = 0
     domain_files = [f"df_cache/df_AlfW_{i}.pddl" for i in range(1, 11)]
     for domain_idx, df_path in enumerate(domain_files, start=1):
