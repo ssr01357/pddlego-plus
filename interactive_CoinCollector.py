@@ -1602,6 +1602,8 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
         for NUM_LOCATIONS in [3,5,7,9,11]: # [3,5,7,9,11]
             for seed_num in range(0, 2):
                 trial += 1
+                if trial < 10:
+                    continue
                 retry = 0
                 while retry < 2:  # allow up to 2 attempts per trial
                     try:
@@ -2475,8 +2477,8 @@ result_name = "6_0430_CC"
 # run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 
 ## Run fixed DF
-run_iterative_model_fixed_df("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_iterative_model_fixed_df("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model_fixed_df("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model_fixed_df("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 run_iterative_model_fixed_df("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 

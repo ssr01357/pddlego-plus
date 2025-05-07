@@ -1814,7 +1814,7 @@ def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-7
         game_lst_sep = game_lst*2
         for problem_id in game_lst_sep: # extra indent
             trial += 1
-            if trial < 27 or trial in [81,28,61,62,29,44,32,85]: 
+            if trial < 71 or trial in [81,28,61,62,29,44,32,85]: 
                 continue
             print(f"Trial {trial} for {game_type} game type")
 
@@ -2405,7 +2405,7 @@ def run_iterative_model_fixed_df(model_name = "deepseek-ai/DeepSeek-R1-Distill-L
                         
                         with open(f"output/{result_name}.csv", "a", newline="") as csvfile: 
                             # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
-                            model_type = 'PDDL'
+                            model_type = 'PDDL_fixed_df'
                             data_row = [today, model_name, model_type, game_type, goal_type, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
                             writer = csv.writer(csvfile)
                             writer.writerow(data_row)
