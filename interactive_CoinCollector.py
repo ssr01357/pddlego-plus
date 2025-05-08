@@ -1602,7 +1602,7 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
         for NUM_LOCATIONS in [3,5,7,9,11]: # [3,5,7,9,11]
             for seed_num in range(0, 2):
                 trial += 1
-                if trial < 10:
+                if trial < 75:
                     continue
                 retry = 0
                 while retry < 2:  # allow up to 2 attempts per trial

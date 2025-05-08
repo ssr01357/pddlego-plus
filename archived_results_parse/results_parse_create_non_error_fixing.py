@@ -2,7 +2,7 @@ import pandas as pd
 import ast
 
 # 1. Read your results file
-file_name = "6_0430_CC"  # 4_0424_Alfworld_50_fixed, 6_0430_CC
+file_name = "4_0424_Alfworld_50_fixed"  # 4_0424_Alfworld_50_fixed, 6_0430_CC
 df = pd.read_csv(
     f"output/{file_name}.csv", 
     header=None,
