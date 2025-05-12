@@ -2123,7 +2123,7 @@ def run_iterative_model_fixed_df(model_name = "deepseek-ai/DeepSeek-R1-Distill-L
             game_lst = game_lst[:2]
             for problem_id in game_lst: # extra indent
                 trial += 1
-                if model_name == "gpt-4.1-2025-04-14" and trial < 23: 
+                if trial < 49: 
                     continue
                 print(f"Trial {trial} for {game_type} game type")
 
@@ -2892,7 +2892,7 @@ result_name = folder_name
 # run_iterative_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 
 # run_iterative_model_fixed_df("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_iterative_model_fixed_df("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model_fixed_df("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 run_iterative_model_fixed_df("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")

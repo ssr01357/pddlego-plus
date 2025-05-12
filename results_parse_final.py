@@ -3,7 +3,7 @@ import numpy as np
 import ast
 
 # === CONFIGURATION ===
-file_name = "6_CoinCollector"  # 4_Alfworld, 
+file_name = "4_Alfworld"  # 4_Alfworld, 6_CoinCollector
 input_csv = f"output/{file_name}.csv"
 output_csv = f"output/{file_name}_summary.csv"
 

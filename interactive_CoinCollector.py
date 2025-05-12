@@ -71,14 +71,26 @@ def run_llm_model(prompt, model_name):
 
     if model_name in close_source_model_lists: # closed source LLMs
         client = OpenAI()
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
-            # max_completion_tokens=2048,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
+        if model_name == 'o4-mini-2025-04-16':
+            response = client.chat.completions.create(
+                    model="o4-mini-2025-04-16",
+                    reasoning_effort="high",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                )
+        else:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                # max_completion_tokens=2048,
+                top_p=1,
+                frequency_penalty=0,
+                presence_penalty=0
+            )
 
         response_content = response.choices[0].message.content
 
@@ -204,14 +216,26 @@ def run_llm_model(prompt, model_name):
 def run_gpt_for_actions_baseline(prompt, model_name):
     if model_name in close_source_model_lists: # closed source LLMs
         client = OpenAI()
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
-            # max_completion_tokens=2048,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
+        if model_name == 'o4-mini-2025-04-16':
+            response = client.chat.completions.create(
+                    model="o4-mini-2025-04-16",
+                    reasoning_effort="high",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                )
+        else:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                # max_completion_tokens=2048,
+                top_p=1,
+                frequency_penalty=0,
+                presence_penalty=0
+            )
 
         response_content = response.choices[0].message.content
 
@@ -893,12 +917,13 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
         If there are errors or obstacles, here is the message:
         {large_loop_error_message if large_loop_error_message else "No errors or obstacles mentioned."}
 
-        Provide the output in strict JSON format like this:
+        Provide the output in strict JSON format like this, while you should only generate one action at a time:
         {{
-            "actions": ["action1", "action2", ...]
+            "actions": ["action1"]
         }}
     """
     #  "while you should only generate one action at a time" "actions": ["action1"]
+    #  "actions": ["action1", "action2", ...]
     actions = run_gpt_for_actions_baseline(prompt, model_name)
     return actions
 
@@ -1340,19 +1365,10 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                 retry += 1
 
 def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
-    # if model_name == 'o3-mini-2025-01-31':
-    #     seed_range_start = 11
-    #     seed_range_end = 21
-    #     trial = 50
-    # else:
-    seed_range_start = 0
-    seed_range_end = 20
     trial = 0
     for NUM_LOCATIONS in [3,5,7,9,11]: # [3,5,7,9,11]
-        for seed_num in range(seed_range_start, seed_range_end):
+        for seed_num in range(4):
             trial += 1
-            if trial < 82 or trial > 82:
-                continue
             retry = 0
             while retry < 2:  # allow up to 2 attempts per trial
                 try:
@@ -2041,7 +2057,7 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
 def run_baseline_model_50(model_name, folder_name="08_031825_alfworld", result_name="alfworld_results"):
     trial = 0
     for NUM_LOCATIONS in [3,5,7,9,11]:
-        for seed_num in range(0,20):
+        for seed_num in range(4): # Change here
             trial += 1
             retry = 0
             while retry < 2:  # allow up to 2 attempts per trial
@@ -2218,7 +2234,7 @@ def run_baseline_model_50(model_name, folder_name="08_031825_alfworld", result_n
                     with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
                         # Write out: date, model_name, trial, coin_found, last step index, last large-loop iteration, and the full trial record.
                         # data_row = [today, model_name, trial, coin_found, len(trial_record)-1, trial_record[-1] if trial_record else None, trial_record]
-                        model_type = 'baseline_multiple_actions' # PDDL
+                        model_type = 'baseline' # PDDL, baseline, baseline_multiple_actions
                         goal_type = 'detailed' # detailed or subgoal
                         data_row = [today, model_name, model_type, NUM_LOCATIONS, goal_type, trial, coin_found, len(trial_record)-1,trial_record[-1][-1], trial_record]
 
@@ -2444,8 +2460,8 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 i = 0
 num_trials = 10
-folder_name = "CC_fixed_df"
-result_name = "6_0430_CC"
+folder_name = "CC_o4_mini_high"
+result_name = folder_name
 
 # run_iteratpive_model("gpt-4.1-2025-04-14", 0, 1, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
@@ -2459,7 +2475,7 @@ result_name = "6_0430_CC"
 # run_baseline_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("deepseek", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name)
-
+run_baseline_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name)
 
 ## Run PDDL generation models
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
@@ -2468,6 +2484,7 @@ result_name = "6_0430_CC"
 # run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
+run_iterative_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
@@ -2479,7 +2496,7 @@ result_name = "6_0430_CC"
 ## Run fixed DF
 # run_iterative_model_fixed_df("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_fixed_df("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_iterative_model_fixed_df("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model_fixed_df("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 
 ## Run pf merging models

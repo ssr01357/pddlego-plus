@@ -85,14 +85,26 @@ def run_llm_model(prompt, model_name):
 
     if model_name in close_source_model_lists: # closed source LLMs
         client = OpenAI()
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
-            # max_completion_tokens=2048,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
+        if model_name == 'o4-mini-2025-04-16':
+            response = client.chat.completions.create(
+                    model="o4-mini-2025-04-16",
+                    reasoning_effort="high",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                )
+        else:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                # max_completion_tokens=2048,
+                top_p=1,
+                frequency_penalty=0,
+                presence_penalty=0
+            )
 
         response_content = response.choices[0].message.content
 
@@ -211,14 +223,26 @@ def run_llm_model(prompt, model_name):
 def run_gpt_for_actions_baseline(prompt, model_name):
     if model_name in close_source_model_lists: # closed source LLMs
         client = OpenAI()
-        response = client.chat.completions.create(
-            model=model_name,
-            messages=[{"role": "user", "content": prompt}],
-            # max_completion_tokens=2048,
-            top_p=1,
-            frequency_penalty=0,
-            presence_penalty=0
-        )
+        if model_name == 'o4-mini-2025-04-16':
+            response = client.chat.completions.create(
+                    model="o4-mini-2025-04-16",
+                    reasoning_effort="high",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ]
+                )
+        else:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=[{"role": "user", "content": prompt}],
+                # max_completion_tokens=2048,
+                top_p=1,
+                frequency_penalty=0,
+                presence_penalty=0
+            )
 
         response_content = response.choices[0].message.content
 
@@ -452,7 +476,6 @@ def summarize_obs(obs):
     else:
         return obs.split('\n')[0].split(". ")[0] + ". " + obs.split('\n')[1]
 
-### === keep modifying this === ###
 def map_actions(action):
     actions = action.lower().replace("(", "").replace(")", "").split('\n')
     action_lst = []
@@ -808,7 +831,7 @@ game_dictionary = {
     "slice+": [29,39,56,3,17,34,49,73,19,64]
 }
 
-print(f"Playing {problem}")
+# print(f"Playing {problem}")
 
 domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
 grammar = pjoin(ALFWORLD_DATA, "logic", "alfred.twl2")
@@ -857,9 +880,9 @@ valid_actions.remove('look')
 valid_actions.remove('inventory')
 valid_actions.remove('help')
 brief_obs = "Action: look around\n" + summarize_obs(init_obs)+'\n'
-print("Initial observation:", init_obs)
-print(goal)
-print("Valid actions:", valid_actions)
+# print("Initial observation:", init_obs)
+# print(goal)
+# print("Valid actions:", valid_actions)
 
 
 def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message=None, goal_type='detailed', goal=goal):
@@ -1022,6 +1045,152 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
     """ 
 
+    prompt_obs_action_without_detailed_goal = f"""
+        You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
+
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle. You can assume all receptacles are freely reachable.
+        
+        Now, {goal}
+        Here are your current observations: {brief_obs}
+
+        Only the following actions are allowed: (There are only two types: object and receptacle)
+        1. go to a receptacle
+            :action GotoLocation
+            :parameters (?from - receptacle ?to - receptacle)
+        2. open a receptacle if it is closed
+            :action OpenObject
+            :parameters (?r - receptacle)
+        3. close a receptacle
+            :action CloseObject
+            :parameters (?r - receptacle)
+        4. take an object from another receptacle
+            :action PickupObject
+            :parameters (?o - object ?r - receptacle)
+        5. put object into/on/in another receptacle
+            :action PutObject
+            :parameters (?o - object ?r - receptacle)
+        6. using an object/receptacle by turning it on/off with a switch
+            :action useObject
+            :parameters (?o - object)
+        7. heat an object using a receptacle
+            :action HeatObject
+            :parameters (?o - object ?r - microwaveReceptacle)
+        8. clean an object using a receptacle
+            :action CleanObject
+            :parameters (?o - object ?r - sinkbasinReceptacle)
+        9. cool an object using a receptacle
+            :action CoolObject
+            :parameters (?o - object ?r - fridgeReceptacle)
+        10. slice an object using a sharp object
+            :action SliceObject
+            :parameters (?r - receptacle ?co - object ?sharp_o - sharpObject)
+
+        You must go to a receptacle first in order to use/open it or take/put objects from/on it.
+
+        The process involves two main stages:
+        Stage 1: Search for the Target Object
+            In this stage, your goal is to go to and may need to open new, unvisited recepatacles until you find the object mentioned in the task. Some receptacles cannot be opened so you can directly see what objects after you go to that receptacle.
+
+            You can only use the GotoLocation action to travel to a new location and the OpenObject action (if the receptacle is closed) to verify whether it contains the target object.
+
+            Goal 1.1: Reach a location that has not been visited (the location should be a receptacle) using the GotoLocation action. 
+            Goal 1.2: If you already go to the recepatacle and found the recepatacle is closed, use the OpenObject action to open it and inspect the contents. 
+
+
+        Stage 2: Use the Object to Complete the Task
+            After you have located the object (the object may have some numbers added), you should always first pick up the object from that receptacle and update your goal to focus on how the object is used to complete the task. Remember your goal is {goal}. Based on different adjectives, you may need to perform different actions for the object in different ways.
+
+            This may involve more than simply transferring it from one place to another.
+            For example: You might examine the object or a nearby receptacle to gather information. You may need to use another tool or device (like a lamp or a switch). Some tasks require you to slice, heat, cool, or clean the object using an appropriate receptacle (e.g., microwave, sink, fridge).
+
+            If necessary, use the PickupObject action to retrieve the item, and the GotoLocation action to move to the correct place.
+            Then, apply the object in a purposeful way — not just move it — but interact with the environment to fulfill the task’s actual goal.
+
+            Hint: 
+            1. If you want to heat, clean, and cool an object, after you go to that aim receptacle, do not put the object in the receptacle but do the action directly. For example, go to fridge, then cool the object with receptacle.
+            2. If you want to slice an object, you should first go to the receptacle where both the sharp object and the aim object are located and ONLY pick up the sharp object then do the slice action. Don't forget to put the sharp object back to the receptacle after you finish slicing.
+            3. If you want to examine or look at an object with a lamp, you should first go to the receptacle where the object is located and then pick it up and take the USE action of the lamp. You don't need to take the lamp but directly use it.
+            4. If there are multiple actions needed to complete the task, you can break them down into smaller subgoals. For example, if you need to slice and then heat an object, first focus on slicing it, and then move on to heating it.
+
+        In summary, the first stage is all about finding the object—this might involve going to an unvisited receptacle and opening it if necessary.
+        
+        Note: 
+        1. some receptacles have numbers in their names. Always keep them as they are. For example, "towelholder1" should not be changed to "towelholder".
+        2. Your initial goal should always be to go to a new location instead of put something into somewhere.
+        3. Do not enter stage 2 when not finishing stage 1.
+
+        Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
+    """ 
+
+    prompt_obs_action_without_hint = f"""
+        You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
+
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle. You can assume all receptacles are freely reachable.
+        
+        Now, {goal}
+        Here are your current observations: {brief_obs}
+
+        Only the following actions are allowed: (There are only two types: object and receptacle)
+        1. go to a receptacle
+            :action GotoLocation
+            :parameters (?from - receptacle ?to - receptacle)
+        2. open a receptacle if it is closed
+            :action OpenObject
+            :parameters (?r - receptacle)
+        3. close a receptacle
+            :action CloseObject
+            :parameters (?r - receptacle)
+        4. take an object from another receptacle
+            :action PickupObject
+            :parameters (?o - object ?r - receptacle)
+        5. put object into/on/in another receptacle
+            :action PutObject
+            :parameters (?o - object ?r - receptacle)
+        6. using an object/receptacle by turning it on/off with a switch
+            :action useObject
+            :parameters (?o - object)
+        7. heat an object using a receptacle
+            :action HeatObject
+            :parameters (?o - object ?r - microwaveReceptacle)
+        8. clean an object using a receptacle
+            :action CleanObject
+            :parameters (?o - object ?r - sinkbasinReceptacle)
+        9. cool an object using a receptacle
+            :action CoolObject
+            :parameters (?o - object ?r - fridgeReceptacle)
+        10. slice an object using a sharp object
+            :action SliceObject
+            :parameters (?r - receptacle ?co - object ?sharp_o - sharpObject)
+
+        You must go to a receptacle first in order to use/open it or take/put objects from/on it.
+
+        The process involves two main stages:
+
+        Stage 1: Search for the Target Object
+            Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
+                You goal should look like this:
+                    (:goal 
+                        (at ?recepatacle)
+                    ) where recepatacle should be somewhere or some recepatacles not visited.
+            Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
+                Your goal should look like this:
+                    (:goal 
+                        (opened ?recepatacle)
+                    ) where recepatacle should be the recepatacle you want to open.
+
+        Stage 2: Use the Object to Complete the Task
+            Goal 2.1: Pick up the target object using the PickupObject action.
+            Goal 2.2: Move to the appropriate location needed to fulfill the task.
+            Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
+
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
+
+        Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
+    """ 
+
     prompt_obs_action_detailed = f"""
         You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
 
@@ -1150,6 +1319,10 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         prompt += prompt_obs_action_detailed
     elif goal_type == 'subgoal':
         prompt += prompt_obs_action_subgoal
+    elif goal_type == 'without_hint':
+        prompt += prompt_obs_action_without_hint
+    elif goal_type == 'without_detailed_goal':
+        prompt += prompt_obs_action_without_detailed_goal
     else:
         prompt += prompt_obs_action_general_goal
 
@@ -1800,32 +1973,24 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 retry += 1
 
 def run_iterative_model_50(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B", folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed", trials_to_run=None):
-    # trial_record = 
-    # structured_info_record = "output/summary"
-    # for trial in range(start_trial, end_trial):
-    # if model_name in ["o3-mini-2025-01-31", "deepseek"]:
-    #     trial = 50
-    # else:
     trial = 0
     for game_type, game_lst in game_dictionary.items():
-        # if model_name in ["o3-mini-2025-01-31", "deepseek"]:
-        #     game_lst_sep = game_lst
-        # else:
-        game_lst_sep = game_lst*2
+        game_lst_sep = game_lst[:4] # only run 4 trials for each game type
+        # game_lst_sep = game_lst*2
         for problem_id in game_lst_sep: # extra indent
             trial += 1
-            if trial < 86: 
-                continue
-            print(f"Trial {trial} for {game_type} game type")
+            # if trial < 86: 
+            #     continue
+            # print(f"Trial {trial} for {game_type} game type")
 
-            if trials_to_run and trial not in trials_to_run: # skip trials not in the list
-                continue
+            # if trials_to_run and trial not in trials_to_run: # skip trials not in the list
+            #     continue
 
             retry = 0
             while retry < 2:  # allow up to 2 attempts per trial
                 try:
                     succeed = False
-                    today = "2025-05-05" #date.today()
+                    today = date.today()
                     fixed_model_name = model_name.replace("/","_")
                     folder_path = f"output/{folder_name}"
                     if not os.path.exists(folder_path):
@@ -2632,17 +2797,11 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 retry += 1
 
 def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
-    if model_name in ["o3-mini-2025-01-31", "deepseek"]:
-        trial = 50
-    else:
-        trial = 0
+    trial = 0
     for game_type, game_lst in game_dictionary.items():
-        if model_name in ["o3-mini-2025-01-31", "deepseek"]:
-            game_lst_sep = game_lst
-        else:
-            game_lst_sep = game_lst*2
+        # game_lst_sep = game_lst*2
+        game_lst_sep = game_lst_sep[:4]
         for problem_id in game_lst_sep:
-        # for problem_id in game_lst: # extra indent
             trial += 1
             # if trial < 13 and model_name == "o3-mini-2025-01-31":
             #     continue
@@ -2856,7 +3015,7 @@ def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-7
 
 i = 0
 num_trials = 10
-folder_name = "7_0503_Alfworld_tem_subgoal"
+folder_name = "AlfW_o4_mini_high"
 result_name = folder_name
 
 ## Run baseline models
@@ -2866,6 +3025,12 @@ result_name = folder_name
 # run_baseline_alfworld("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
+# run_baseline_alfworld_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_alfworld_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+
 
 ## Run PDDL generation models
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
@@ -2873,23 +3038,22 @@ result_name = folder_name
 # run_iterative_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model("deepseek", 7, 10, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+
 
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
-# run_baseline_alfworld_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-
+# run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="without_hint")
+# run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="without_detailed_goal")
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
+# run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 
 
-# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-# run_iterative_model("deepseek", 7, 10, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
