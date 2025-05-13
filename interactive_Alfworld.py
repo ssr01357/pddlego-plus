@@ -2800,7 +2800,7 @@ def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-7
     trial = 0
     for game_type, game_lst in game_dictionary.items():
         # game_lst_sep = game_lst*2
-        game_lst_sep = game_lst_sep[:4]
+        game_lst_sep = game_lst[:4]
         for problem_id in game_lst_sep:
             trial += 1
             # if trial < 13 and model_name == "o3-mini-2025-01-31":
