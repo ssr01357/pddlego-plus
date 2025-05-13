@@ -1,0 +1,106 @@
+Observations: You are in the kitchen. In one part of the room you see a stove. There is also an oven. You also see a fridge that is closed. In another part of the room you see a counter, that has nothing on it. In one part of the room you see a kitchen cupboard that is closed. There is also a cutlery drawer that is closed. You also see a trash can that is closed. In another part of the room you see a dishwasher that is closed. In one part of the room you see a dining chair, that has nothing on it. 
+To the East you see a closed plain door. To the West you see the corridor.  
+Gold path: ['look around', 'open door to east', 'move west', 'take coin'] 
+Valid Actions: ['open door to east', 'inventory', 'move east', 'close door to east', 'move west', 'look around'] 
+taskDescription: Your task is to search the environment and find the coin.  Once you find the coin, take it. 
+Fixed Domain File df_cache/df_CC_6.pddl:
+ (define (domain exploration)
+  (:requirements :strips :typing)
+  (:types location direction)
+  (:predicates
+    (at ?l - location)
+    (door-open ?loc1 - location ?loc2 - location ?dir - direction)
+    (door-closed ?loc1 - location ?loc2 - location ?dir - direction)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (door-closed ?loc1 ?loc2 ?dir))
+    :effect (and (not (door-closed ?loc1 ?loc2 ?dir)) (door-open ?loc1 ?loc2 ?dir))
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (or (door-open ?from ?to ?dir) (connected ?from ?to ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+brief_obs: Action: look around
+You are in the kitchen. To the East you see a closed plain door. To the West you see the corridor. 
+ 
+
+
+====Step 0==== 
+
+----Larger Loop No. 0---- 
+successful_actions: [] 
+Small Loop, action_queue: [] 
+--Small Loop--: 0 
+Error: None 
+Prompt: 
+        Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL problem file as 'pf'. The domain file is fixed and will be provided below. It should not be modified.
+        The format should strictly be:
+            {
+            "pf": "..."
+            }
+
+        You are in an environment that you explore step by step. You must build and update PDDL files of the environment based on only your observations. 
+        Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
+        Do not assume that there will be a door connecting rooms.
+        Your task is always to keep exploration and go to a location you have not visited yet.
+        In other words, your goal should go to other not visited location.
+        If you enter a room, make sure you put everything you observed such as the direction in the problem file.
+        Here are your current observations: Action: look around
+You are in the kitchen. To the East you see a closed plain door. To the West you see the corridor. 
+
+        Here are some valid actions you can take: ['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+        You should have a goal in the problem file like this: 
+        (:goal 
+            (at ?location)
+        ) where location should be somewhere not visited
+        Note: in problem file's init, you shouldn't have "not ()" but only the single status
+
+        This is the fixed domain file and you should not modify it: 
+        (define (domain exploration)
+  (:requirements :strips :typing)
+  (:types location direction)
+  (:predicates
+    (at ?l - location)
+    (door-open ?loc1 - location ?loc2 - location ?dir - direction)
+    (door-closed ?loc1 - location ?loc2 - location ?dir - direction)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (door-closed ?loc1 ?loc2 ?dir))
+    :effect (and (not (door-closed ?loc1 ?loc2 ?dir)) (door-open ?loc1 ?loc2 ?dir))
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (or (door-open ?from ?to ?dir) (connected ?from ?to ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+     
+Generated pf: 
+ (define (problem explore)
+    (:domain exploration)
+    (:objects
+        kitchen corridor room_east - location
+        east west - direction
+    )
+    (:init
+        (at kitchen)
+        (connected kitchen corridor west)
+        (door-closed kitchen room_east east)
+    )
+    (:goal
+        (at corridor)
+    )
+) 
+Actions from solver(df, pf): ['move west'] 
+Current action_queue: ['move west'] 
+Coin found!

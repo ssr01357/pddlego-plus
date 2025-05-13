@@ -1,0 +1,1317 @@
+Playing 22: /Users/krystalgong/.cache/alfworld/json_2.1.1/valid_seen/look_at_obj_in_light-Pillow-None-DeskLamp-302/trial_T20190909_150916_682139 
+Observations: You are in the middle of a room. Looking quickly around you, you see a bed 1, a desk 1, a drawer 3, a drawer 2, a drawer 1, a garbagecan 1, a safe 1, a shelf 5, a shelf 4, a shelf 3, a shelf 2, a shelf 1, a sidetable 2, and a sidetable 1. 
+Valid Actions: ['go to bed 1', 'go to desk 1', 'go to drawer 1', 'go to drawer 2', 'go to drawer 3', 'go to garbagecan 1', 'go to safe 1', 'go to shelf 1', 'go to shelf 2', 'go to shelf 3', 'go to shelf 4', 'go to shelf 5', 'go to sidetable 1', 'go to sidetable 2', 'help', 'inventory', 'look'] 
+taskDescription: Your task is to: examine the pillow with the desklamp. 
+brief_obs: Action: look around
+You are in the middle of a room. Looking quickly around you, you see a bed 1, a desk 1, a drawer 3, a drawer 2, a drawer 1, a garbagecan 1, a safe 1, a shelf 5, a shelf 4, a shelf 3, a shelf 2, a shelf 1, a sidetable 2, and a sidetable 1.
+ 
+
+
+====Step 0==== 
+
+----Larger Loop No. 0---- 
+successful_actions: [] 
+Small Loop, action_queue: [] 
+--Small Loop--: 0 
+Error: None 
+Prompt: 
+        Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
+        The format should strictly be:
+            {
+            "df": "...",
+            "pf": "..."
+            }
+    
+        You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
+
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle. You can assume all receptacles are freely reachable.
+        
+        Now, Your task is to: examine the pillow with the desklamp.
+        Here are your current observations: Action: look around
+You are in the middle of a room. Looking quickly around you, you see a bed 1, a desk 1, a drawer 3, a drawer 2, a drawer 1, a garbagecan 1, a safe 1, a shelf 5, a shelf 4, a shelf 3, a shelf 2, a shelf 1, a sidetable 2, and a sidetable 1.
+
+
+        The following actions are allowed: (There are only two types: object and receptacle)
+        1. go to a receptacle
+            :action GotoLocation
+            :parameters (?from - receptacle ?to - receptacle)
+        2. open a receptacle if it is closed
+            :action OpenObject
+            :parameters (?r - receptacle)
+        3. close a receptacle
+            :action CloseObject
+            :parameters (?r - receptacle)
+        4. take an object from another receptacle
+            :action PickupObject
+            :parameters (?o - object ?r - receptacle)
+        5. put object into/on/in another receptacle
+            :action PutObject
+            :parameters (?o - object ?r - receptacle)
+        6. using an object/receptacle by turning it on/off with a switch
+            :action useObject
+            :parameters (?o - object)
+        7. heat an object using a receptacle
+            :action HeatObject
+            :parameters (?o - object ?r - microwaveReceptacle)
+        8. clean an object using a receptacle
+            :action CleanObject
+            :parameters (?o - object ?r - receptacle)
+        9. cool an object using a receptacle
+            :action CoolObject
+            :parameters (?o - object ?r - fridgeReceptacle)
+        10. slice an object using a sharp object
+            :action SliceObject
+            :parameters (?r - receptacle ?co - object ?sharp_o - object)
+
+        Your process involves two main stages with the following subgoals:
+
+        Stage 1: Search for the Target Object
+            Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
+            Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
+
+        Stage 2: Use the Object to Complete the Task
+            Goal 2.1: Pick up the target object using the PickupObject action.
+            Goal 2.2: Move to the appropriate location needed to fulfill the task.
+            Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
+
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
+        
+        Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
+     
+Generated df and pf: 
+ (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+) 
+ (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal
+    (and)
+  )
+) 
+Actions from solver(df, pf): None 
+--Small Loop--: 1 
+Error: None 
+Prompt: 
+        Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
+        The format should strictly be:
+            {
+            "df": "...",
+            "pf": "..."
+            }
+    
+        You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
+
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle. You can assume all receptacles are freely reachable.
+        
+        Now, Your task is to: examine the pillow with the desklamp.
+        Here are your current observations: Action: look around
+You are in the middle of a room. Looking quickly around you, you see a bed 1, a desk 1, a drawer 3, a drawer 2, a drawer 1, a garbagecan 1, a safe 1, a shelf 5, a shelf 4, a shelf 3, a shelf 2, a shelf 1, a sidetable 2, and a sidetable 1.
+
+
+        The following actions are allowed: (There are only two types: object and receptacle)
+        1. go to a receptacle
+            :action GotoLocation
+            :parameters (?from - receptacle ?to - receptacle)
+        2. open a receptacle if it is closed
+            :action OpenObject
+            :parameters (?r - receptacle)
+        3. close a receptacle
+            :action CloseObject
+            :parameters (?r - receptacle)
+        4. take an object from another receptacle
+            :action PickupObject
+            :parameters (?o - object ?r - receptacle)
+        5. put object into/on/in another receptacle
+            :action PutObject
+            :parameters (?o - object ?r - receptacle)
+        6. using an object/receptacle by turning it on/off with a switch
+            :action useObject
+            :parameters (?o - object)
+        7. heat an object using a receptacle
+            :action HeatObject
+            :parameters (?o - object ?r - microwaveReceptacle)
+        8. clean an object using a receptacle
+            :action CleanObject
+            :parameters (?o - object ?r - receptacle)
+        9. cool an object using a receptacle
+            :action CoolObject
+            :parameters (?o - object ?r - fridgeReceptacle)
+        10. slice an object using a sharp object
+            :action SliceObject
+            :parameters (?r - receptacle ?co - object ?sharp_o - object)
+
+        Your process involves two main stages with the following subgoals:
+
+        Stage 1: Search for the Target Object
+            Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
+            Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
+
+        Stage 2: Use the Object to Complete the Task
+            Goal 2.1: Pick up the target object using the PickupObject action.
+            Goal 2.2: Move to the appropriate location needed to fulfill the task.
+            Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
+
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
+        
+        Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
+    
+        This is previous domain file: (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+)
+        This is previous problem file: (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal
+    (and)
+  )
+)
+        This is all the memory you have in this game including each action and its corresponding observations: None
+    
+        You made some mistakes when generating those files. Here is the error message: None; 
+warning: empty con/disjunction in domain definition. simplifying.
+
+
+ff: goal can be simplified to TRUE. The empty plan solves it
+
+
+        Now modify those two files according to the error message.
+     
+Generated df and pf: 
+ (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+) 
+ (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal
+    (true)
+  )
+) 
+Actions from solver(df, pf): None 
+--Small Loop--: 2 
+Error: None 
+Prompt: 
+        Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
+        The format should strictly be:
+            {
+            "df": "...",
+            "pf": "..."
+            }
+    
+        You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
+
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle. You can assume all receptacles are freely reachable.
+        
+        Now, Your task is to: examine the pillow with the desklamp.
+        Here are your current observations: Action: look around
+You are in the middle of a room. Looking quickly around you, you see a bed 1, a desk 1, a drawer 3, a drawer 2, a drawer 1, a garbagecan 1, a safe 1, a shelf 5, a shelf 4, a shelf 3, a shelf 2, a shelf 1, a sidetable 2, and a sidetable 1.
+
+
+        The following actions are allowed: (There are only two types: object and receptacle)
+        1. go to a receptacle
+            :action GotoLocation
+            :parameters (?from - receptacle ?to - receptacle)
+        2. open a receptacle if it is closed
+            :action OpenObject
+            :parameters (?r - receptacle)
+        3. close a receptacle
+            :action CloseObject
+            :parameters (?r - receptacle)
+        4. take an object from another receptacle
+            :action PickupObject
+            :parameters (?o - object ?r - receptacle)
+        5. put object into/on/in another receptacle
+            :action PutObject
+            :parameters (?o - object ?r - receptacle)
+        6. using an object/receptacle by turning it on/off with a switch
+            :action useObject
+            :parameters (?o - object)
+        7. heat an object using a receptacle
+            :action HeatObject
+            :parameters (?o - object ?r - microwaveReceptacle)
+        8. clean an object using a receptacle
+            :action CleanObject
+            :parameters (?o - object ?r - receptacle)
+        9. cool an object using a receptacle
+            :action CoolObject
+            :parameters (?o - object ?r - fridgeReceptacle)
+        10. slice an object using a sharp object
+            :action SliceObject
+            :parameters (?r - receptacle ?co - object ?sharp_o - object)
+
+        Your process involves two main stages with the following subgoals:
+
+        Stage 1: Search for the Target Object
+            Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
+            Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
+
+        Stage 2: Use the Object to Complete the Task
+            Goal 2.1: Pick up the target object using the PickupObject action.
+            Goal 2.2: Move to the appropriate location needed to fulfill the task.
+            Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
+
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
+        
+        Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
+    
+        This is previous domain file: (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+)
+        This is previous problem file: (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal
+    (true)
+  )
+)
+        This is all the memory you have in this game including each action and its corresponding observations: None
+    
+        You made some mistakes when generating those files. Here is the error message: None; 
+undeclared predicate TRUE used in domain definition
+
+
+        Now modify those two files according to the error message.
+     
+Generated df and pf: 
+ (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+) 
+ (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal
+    )
+) 
+Actions from solver(df, pf): None 
+--Small Loop--: 3 
+Error: None 
+Prompt: 
+        Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
+        The format should strictly be:
+            {
+            "df": "...",
+            "pf": "..."
+            }
+    
+        You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
+
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle. You can assume all receptacles are freely reachable.
+        
+        Now, Your task is to: examine the pillow with the desklamp.
+        Here are your current observations: Action: look around
+You are in the middle of a room. Looking quickly around you, you see a bed 1, a desk 1, a drawer 3, a drawer 2, a drawer 1, a garbagecan 1, a safe 1, a shelf 5, a shelf 4, a shelf 3, a shelf 2, a shelf 1, a sidetable 2, and a sidetable 1.
+
+
+        The following actions are allowed: (There are only two types: object and receptacle)
+        1. go to a receptacle
+            :action GotoLocation
+            :parameters (?from - receptacle ?to - receptacle)
+        2. open a receptacle if it is closed
+            :action OpenObject
+            :parameters (?r - receptacle)
+        3. close a receptacle
+            :action CloseObject
+            :parameters (?r - receptacle)
+        4. take an object from another receptacle
+            :action PickupObject
+            :parameters (?o - object ?r - receptacle)
+        5. put object into/on/in another receptacle
+            :action PutObject
+            :parameters (?o - object ?r - receptacle)
+        6. using an object/receptacle by turning it on/off with a switch
+            :action useObject
+            :parameters (?o - object)
+        7. heat an object using a receptacle
+            :action HeatObject
+            :parameters (?o - object ?r - microwaveReceptacle)
+        8. clean an object using a receptacle
+            :action CleanObject
+            :parameters (?o - object ?r - receptacle)
+        9. cool an object using a receptacle
+            :action CoolObject
+            :parameters (?o - object ?r - fridgeReceptacle)
+        10. slice an object using a sharp object
+            :action SliceObject
+            :parameters (?r - receptacle ?co - object ?sharp_o - object)
+
+        Your process involves two main stages with the following subgoals:
+
+        Stage 1: Search for the Target Object
+            Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
+            Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
+
+        Stage 2: Use the Object to Complete the Task
+            Goal 2.1: Pick up the target object using the PickupObject action.
+            Goal 2.2: Move to the appropriate location needed to fulfill the task.
+            Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
+
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
+        
+        Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
+    
+        This is previous domain file: (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+)
+        This is previous problem file: (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal
+    )
+)
+        This is all the memory you have in this game including each action and its corresponding observations: None
+    
+        You made some mistakes when generating those files. Here is the error message: None; 
+problem: syntax error in line 11, ')':
+'define' expected
+
+        Now modify those two files according to the error message.
+     
+Generated df and pf: 
+ (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+)
+ 
+ (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal
+  )
+)
+ 
+Actions from solver(df, pf): None 
+--Small Loop--: 4 
+Error: None 
+Prompt: 
+        Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
+        The format should strictly be:
+            {
+            "df": "...",
+            "pf": "..."
+            }
+    
+        You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
+
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle. You can assume all receptacles are freely reachable.
+        
+        Now, Your task is to: examine the pillow with the desklamp.
+        Here are your current observations: Action: look around
+You are in the middle of a room. Looking quickly around you, you see a bed 1, a desk 1, a drawer 3, a drawer 2, a drawer 1, a garbagecan 1, a safe 1, a shelf 5, a shelf 4, a shelf 3, a shelf 2, a shelf 1, a sidetable 2, and a sidetable 1.
+
+
+        The following actions are allowed: (There are only two types: object and receptacle)
+        1. go to a receptacle
+            :action GotoLocation
+            :parameters (?from - receptacle ?to - receptacle)
+        2. open a receptacle if it is closed
+            :action OpenObject
+            :parameters (?r - receptacle)
+        3. close a receptacle
+            :action CloseObject
+            :parameters (?r - receptacle)
+        4. take an object from another receptacle
+            :action PickupObject
+            :parameters (?o - object ?r - receptacle)
+        5. put object into/on/in another receptacle
+            :action PutObject
+            :parameters (?o - object ?r - receptacle)
+        6. using an object/receptacle by turning it on/off with a switch
+            :action useObject
+            :parameters (?o - object)
+        7. heat an object using a receptacle
+            :action HeatObject
+            :parameters (?o - object ?r - microwaveReceptacle)
+        8. clean an object using a receptacle
+            :action CleanObject
+            :parameters (?o - object ?r - receptacle)
+        9. cool an object using a receptacle
+            :action CoolObject
+            :parameters (?o - object ?r - fridgeReceptacle)
+        10. slice an object using a sharp object
+            :action SliceObject
+            :parameters (?r - receptacle ?co - object ?sharp_o - object)
+
+        Your process involves two main stages with the following subgoals:
+
+        Stage 1: Search for the Target Object
+            Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
+            Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
+
+        Stage 2: Use the Object to Complete the Task
+            Goal 2.1: Pick up the target object using the PickupObject action.
+            Goal 2.2: Move to the appropriate location needed to fulfill the task.
+            Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
+
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
+        
+        Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
+    
+        This is previous domain file: (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+)
+
+        This is previous problem file: (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal
+  )
+)
+
+        This is all the memory you have in this game including each action and its corresponding observations: None
+    
+        You made some mistakes when generating those files. Here is the error message: None; 
+problem: syntax error in line 11, ')':
+'define' expected
+
+        Now modify those two files according to the error message.
+     
+Generated df and pf: 
+ (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+)
+ 
+ (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal)
+)
+ 
+Actions from solver(df, pf): None 
+--Small Loop--: 5 
+Error: None 
+Prompt: 
+        Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
+        The format should strictly be:
+            {
+            "df": "...",
+            "pf": "..."
+            }
+    
+        You are in an environment that you must explore step by step. Your task is to build and update PDDL files for the environment using only your direct observations. Do not create or assume any objects, relationships, or details that have not been observed, and ensure you include all observations.
+
+        The environment is a room containing various objects. Some of these objects are on, in, or contained within other objects and receptacles. You will initially be located as init_receptacle. You can assume all receptacles are freely reachable.
+        
+        Now, Your task is to: examine the pillow with the desklamp.
+        Here are your current observations: Action: look around
+You are in the middle of a room. Looking quickly around you, you see a bed 1, a desk 1, a drawer 3, a drawer 2, a drawer 1, a garbagecan 1, a safe 1, a shelf 5, a shelf 4, a shelf 3, a shelf 2, a shelf 1, a sidetable 2, and a sidetable 1.
+
+
+        The following actions are allowed: (There are only two types: object and receptacle)
+        1. go to a receptacle
+            :action GotoLocation
+            :parameters (?from - receptacle ?to - receptacle)
+        2. open a receptacle if it is closed
+            :action OpenObject
+            :parameters (?r - receptacle)
+        3. close a receptacle
+            :action CloseObject
+            :parameters (?r - receptacle)
+        4. take an object from another receptacle
+            :action PickupObject
+            :parameters (?o - object ?r - receptacle)
+        5. put object into/on/in another receptacle
+            :action PutObject
+            :parameters (?o - object ?r - receptacle)
+        6. using an object/receptacle by turning it on/off with a switch
+            :action useObject
+            :parameters (?o - object)
+        7. heat an object using a receptacle
+            :action HeatObject
+            :parameters (?o - object ?r - microwaveReceptacle)
+        8. clean an object using a receptacle
+            :action CleanObject
+            :parameters (?o - object ?r - receptacle)
+        9. cool an object using a receptacle
+            :action CoolObject
+            :parameters (?o - object ?r - fridgeReceptacle)
+        10. slice an object using a sharp object
+            :action SliceObject
+            :parameters (?r - receptacle ?co - object ?sharp_o - object)
+
+        Your process involves two main stages with the following subgoals:
+
+        Stage 1: Search for the Target Object
+            Goal 1.1: Move to a new, unvisited receptacle using the GotoLocation action.
+            Goal 1.2: If the receptacle is closed, use the OpenObject action to reveal its contents.
+
+        Stage 2: Use the Object to Complete the Task
+            Goal 2.1: Pick up the target object using the PickupObject action.
+            Goal 2.2: Move to the appropriate location needed to fulfill the task.
+            Goal 2.3: Interact with relevant objects or receptacles (e.g., heat, clean, cool, slice, or use) to accomplish the task.
+
+        Constraints:
+            1. Do not assume unseen objects or relationships.
+            2. Receptacle names must be preserved exactly.
+            3. Do not proceed to Stage 2 before completing Stage 1.
+        
+        Note: Always include :negative-preconditions in your :requirements whenever you use (not …) or delete effects, and never leave an :precondition or :effect block empty—either omit it or include at least one literal.
+    
+        This is previous domain file: (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+)
+
+        This is previous problem file: (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal)
+)
+
+        This is all the memory you have in this game including each action and its corresponding observations: None
+    
+        You made some mistakes when generating those files. Here is the error message: None; 
+problem: syntax error in line 10, ')':
+'define' expected
+
+        Now modify those two files according to the error message.
+     
+Generated df and pf: 
+ (define (domain explore-room)
+  (:requirements :strips :typing :negative-preconditions)
+  (:types object receptacle)
+  (:predicates
+    (at ?r - receptacle)
+    (opened ?r - receptacle)
+    (contains ?r - receptacle ?o - object)
+    (in ?o - object ?r - receptacle)
+    (on ?o - object ?r - receptacle)
+    (picked-up ?o - object)
+    (used ?o - object)
+  )
+  (:action GotoLocation
+    :parameters (?from - receptacle ?to - receptacle)
+    :precondition (at ?from)
+    :effect (and (not (at ?from)) (at ?to))
+  )
+  (:action OpenObject
+    :parameters (?r - receptacle)
+    :precondition (not (opened ?r))
+    :effect (opened ?r)
+  )
+  (:action CloseObject
+    :parameters (?r - receptacle)
+    :precondition (opened ?r)
+    :effect (not (opened ?r))
+  )
+  (:action PickupObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (at ?r) (contains ?r ?o))
+    :effect (and (picked-up ?o) (not (contains ?r ?o)))
+  )
+  (:action PutObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (picked-up ?o)
+    :effect (and (contains ?r ?o) (not (picked-up ?o)))
+  )
+  (:action useObject
+    :parameters (?o - object)
+    :precondition (picked-up ?o)
+    :effect (used ?o)
+  )
+  (:action HeatObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CleanObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action CoolObject
+    :parameters (?o - object ?r - receptacle)
+    :precondition (and (picked-up ?o) (at ?r))
+    :effect (used ?o)
+  )
+  (:action SliceObject
+    :parameters (?r - receptacle ?co - object ?sharp_o - object)
+    :precondition (and (at ?r) (contains ?r ?co) (picked-up ?sharp_o))
+    :effect (used ?co)
+  )
+) 
+ (define (problem explore-room-prob)
+  (:domain explore-room)
+  (:objects
+    bed_1 desk_1 drawer_1 drawer_2 drawer_3 garbagecan_1 safe_1 shelf_1 shelf_2 shelf_3 shelf_4 shelf_5 sidetable_1 sidetable_2 - receptacle
+    init_receptacle - receptacle
+  )
+  (:init
+    (at init_receptacle)
+  )
+  (:goal )
+) 
+Actions from solver(df, pf): None 
