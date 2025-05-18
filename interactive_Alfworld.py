@@ -3069,6 +3069,7 @@ result_name = folder_name
 # run_iterative_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
+
 ## Run PDDLego+ with multiple prompts
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="without_hint")
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="without_detailed_goal")

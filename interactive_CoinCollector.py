@@ -2494,44 +2494,46 @@ num_trials = 1
 folder_name = "CC_o4_mini_high"
 result_name = folder_name
 
-# run_iteratpive_model("gpt-4.1-2025-04-14", 0, 1, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-
-## Run baseline models
+## Run PlanGen models
 # run_baseline_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name)
+
 # run_baseline_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("deepseek", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name)
-run_baseline_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name)
+# run_baseline_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name)
 
-## Run PDDL generation models
+
+## Run PDDLego+ models
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
-run_iterative_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
+
+## Run PDDLego+ with multiple prompts
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 
-## Run fixed DF
+
+## Run PDDLego+ with fixed domain file
 # run_iterative_model_fixed_df("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_fixed_df("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_fixed_df("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 
 ## Run pf merging models
- 
 # run_merging_pf_model("o3-mini-2025-01-31", 12, 13, merging_method="llm")
 # run_merging_pf_model("gpt-4o-2024-05-13", 9, 11, merging_method="llm")
 # run_merging_pf_model("deepseek-ai/DeepSeek-R1-Distill-Llama-70B", 0, 6, merging_method="llm")
