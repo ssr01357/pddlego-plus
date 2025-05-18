@@ -17,8 +17,20 @@ from openai import OpenAI
 import os
 
 client = OpenAI()
-# os.environ["OPENAI_API_KEY"] = ""
 
+## Run models on server
+# lockfile = "/tmp/coincollector.lock"
+
+# if os.path.exists(lockfile):
+#     print("Another instance is already running.")
+#     sys.exit(1)
+
+# with open(lockfile, 'w') as f:
+#     f.write(str(os.getpid()))
+    
+# # set up HuggingFace and Kani
+# _hf_engine_cache: dict[str, HuggingEngine] = {}
+# _kani_cache: dict[str, Kani] = {}
 
 # Solver set up
 def run_solver(domain_file, problem_file, solver, max_retries=3):
@@ -145,21 +157,30 @@ def run_llm_model(prompt, model_name):
         """
         async def _ask_model(model_name, user_prompt):
             # Create Hugging Face engine
-            engine = HuggingEngine(
-                model_id=model_name,
-                use_auth_token=True, 
-                model_load_kwargs={
-                    "device_map": "auto",
-                    "trust_remote_code": True
-                }
-            )
-            # Wrap in Kani
-            ai = Kani(engine, system_prompt="")
+            # engine = HuggingEngine(
+            #     model_id=model_name,
+            #     use_auth_token=True, 
+            #     model_load_kwargs={
+            #         "device_map": "auto",
+            #         "trust_remote_code": True
+            #     }
+            # )
+            # # Wrap in Kani
+            # ai = Kani(engine, system_prompt="")
 
-            # Send the user prompt and get the response string
-            response = await ai.chat_round_str(user_prompt)
-            return response
-
+            # # Send the user prompt and get the response string
+            # response = await ai.chat_round_str(user_prompt)
+            # return response
+            if model_name not in _hf_engine_cache:
+                engine = HuggingEngine(
+                    model_id=model_name,
+                    use_auth_token=True,
+                    model_load_kwargs={"device_map": "auto", "trust_remote_code": True}
+                )
+                _hf_engine_cache[model_name] = engine
+                _kani_cache[model_name] = Kani(engine, system_prompt="")
+            ai = _kani_cache[model_name]
+            return await ai.chat_round_str(user_prompt)
         # Because Kani calls are async, we need to run them in an event loop
         response_content = asyncio.run(_ask_model(model_name, prompt))
 
@@ -307,20 +328,30 @@ def run_gpt_for_actions_baseline(prompt, model_name):
         """
         async def _ask_model(model_name, user_prompt):
             # Create Hugging Face engine
-            engine = HuggingEngine(
-                model_id=model_name,
-                use_auth_token=True, 
-                model_load_kwargs={
-                    "device_map": "auto",
-                    "trust_remote_code": True
-                }
-            )
-            # Wrap in Kani
-            ai = Kani(engine, system_prompt="")
+            # engine = HuggingEngine(
+            #     model_id=model_name,
+            #     use_auth_token=True, 
+            #     model_load_kwargs={
+            #         "device_map": "auto",
+            #         "trust_remote_code": True
+            #     }
+            # )
+            # # Wrap in Kani
+            # ai = Kani(engine, system_prompt="")
 
-            # Send the user prompt and get the response string
-            response = await ai.chat_round_str(user_prompt)
-            return response
+            # # Send the user prompt and get the response string
+            # response = await ai.chat_round_str(user_prompt)
+            # return response
+            if model_name not in _hf_engine_cache:
+                engine = HuggingEngine(
+                    model_id=model_name,
+                    use_auth_token=True,
+                    model_load_kwargs={"device_map": "auto", "trust_remote_code": True}
+                )
+                _hf_engine_cache[model_name] = engine
+                _kani_cache[model_name] = Kani(engine, system_prompt="")
+            ai = _kani_cache[model_name]
+            return await ai.chat_round_str(user_prompt)
 
         # Because Kani calls are async, we need to run them in an event loop
         response_content = asyncio.run(_ask_model(model_name, prompt))
@@ -360,8 +391,8 @@ def run_gpt_for_actions_baseline(prompt, model_name):
 
         actions = result.get("actions", None)
 
-        if actions is None:
-            raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
+        # if actions is None:
+        #     raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
 
         return actions
 

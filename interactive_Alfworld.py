@@ -6,25 +6,24 @@ import csv
 import json
 import asyncio
 import re
-print(1)
+
 ## module for server
 # from kani import Kani
 # from kani.engines.huggingface import HuggingEngine
 
 import subprocess
 import requests
-print(2)
 import os
 import json
 import glob
 import random
 import argparse
 from os.path import join as pjoin
-print(3)
+
 from textworld_express import TextWorldExpressEnv
 import textworld
 import textworld.gym
-print(4)
+
 from alfworld.info import ALFWORLD_DATA
 from alfworld.agents.utils.misc import add_task_to_grammar
 from alfworld.agents.environment.alfred_tw_env import AlfredExpert, AlfredDemangler, AlfredExpertType
@@ -32,6 +31,19 @@ from alfworld.agents.environment.alfred_tw_env import AlfredExpert, AlfredDemang
 from openai import OpenAI
 print('finishing import')
 
+## Run models on server
+# # os.environ["OPENAI_API_KEY"] = ""
+# lockfile = "/tmp/Alfworld.lock"
+
+# if os.path.exists(lockfile):
+#     print("Another instance is already running.")
+#     sys.exit(1)
+
+# with open(lockfile, 'w') as f:
+#     f.write(str(os.getpid()))
+# # set up HuggingFace and Kani
+# _hf_engine_cache: dict[str, HuggingEngine] = {}
+# _kani_cache: dict[str, Kani] = {}
 
 # Solver set up
 def run_solver(domain_file, problem_file, solver, max_retries=3):
@@ -158,21 +170,30 @@ def run_llm_model(prompt, model_name):
         """
         async def _ask_model(model_name, user_prompt):
             # Create Hugging Face engine
-            engine = HuggingEngine(
-                model_id=model_name,
-                use_auth_token=True, 
-                model_load_kwargs={
-                    "device_map": "auto",
-                    "trust_remote_code": True
-                }
-            )
-            # Wrap in Kani
-            ai = Kani(engine, system_prompt="")
+            # engine = HuggingEngine(
+            #     model_id=model_name,
+            #     use_auth_token=True, 
+            #     model_load_kwargs={
+            #         "device_map": "auto",
+            #         "trust_remote_code": True
+            #     }
+            # )
+            # # Wrap in Kani
+            # ai = Kani(engine, system_prompt="")
 
-            # Send the user prompt and get the response string
-            response = await ai.chat_round_str(user_prompt)
-            return response
-
+            # # Send the user prompt and get the response string
+            # response = await ai.chat_round_str(user_prompt)
+            # return response
+            if model_name not in _hf_engine_cache:
+                engine = HuggingEngine(
+                    model_id=model_name,
+                    use_auth_token=True,
+                    model_load_kwargs={"device_map": "auto", "trust_remote_code": True}
+                )
+                _hf_engine_cache[model_name] = engine
+                _kani_cache[model_name] = Kani(engine, system_prompt="")
+            ai = _kani_cache[model_name]
+            return await ai.chat_round_str(user_prompt)
         # Because Kani calls are async, we need to run them in an event loop
         response_content = asyncio.run(_ask_model(model_name, prompt))
 
@@ -212,10 +233,10 @@ def run_llm_model(prompt, model_name):
         df = result.get("df")
         pf = result.get("pf")
 
-        if df is None or pf is None:
-            raise ValueError(
-                "Missing 'df' or 'pf' in the response. Check your prompt or the model's output."
-            )
+        # if df is None or pf is None:
+        #     raise ValueError(
+        #         "Missing 'df' or 'pf' in the response. Check your prompt or the model's output."
+        #     )
 
         return df, pf
 
@@ -313,21 +334,30 @@ def run_gpt_for_actions_baseline(prompt, model_name):
         """
         async def _ask_model(model_name, user_prompt):
             # Create Hugging Face engine
-            engine = HuggingEngine(
-                model_id=model_name,
-                use_auth_token=True, 
-                model_load_kwargs={
-                    "device_map": "auto",
-                    "trust_remote_code": True
-                }
-            )
-            # Wrap in Kani
-            ai = Kani(engine, system_prompt="")
+            # engine = HuggingEngine(
+            #     model_id=model_name,
+            #     use_auth_token=True, 
+            #     model_load_kwargs={
+            #         "device_map": "auto",
+            #         "trust_remote_code": True
+            #     }
+            # )
+            # # Wrap in Kani
+            # ai = Kani(engine, system_prompt="")
 
-            # Send the user prompt and get the response string
-            response = await ai.chat_round_str(user_prompt)
-            return response
-
+            # # Send the user prompt and get the response string
+            # response = await ai.chat_round_str(user_prompt)
+            # return response
+            if model_name not in _hf_engine_cache:
+                engine = HuggingEngine(
+                    model_id=model_name,
+                    use_auth_token=True,
+                    model_load_kwargs={"device_map": "auto", "trust_remote_code": True}
+                )
+                _hf_engine_cache[model_name] = engine
+                _kani_cache[model_name] = Kani(engine, system_prompt="")
+            ai = _kani_cache[model_name]
+            return await ai.chat_round_str(user_prompt)
         # Because Kani calls are async, we need to run them in an event loop
         response_content = asyncio.run(_ask_model(model_name, prompt))
 
@@ -880,9 +910,6 @@ valid_actions.remove('look')
 valid_actions.remove('inventory')
 valid_actions.remove('help')
 brief_obs = "Action: look around\n" + summarize_obs(init_obs)+'\n'
-# print("Initial observation:", init_obs)
-# print(goal)
-# print("Valid actions:", valid_actions)
 
 
 def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message=None, goal_type='detailed', goal=goal):
@@ -1509,12 +1536,8 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
             "actions": ["action1"]
         }}
     """
-    # if goal_type == 'detailed':
+
     prompt = prompt_detailed
-    # elif goal_type == 'subgoal':
-    #     prompt = prompt_subgoal
-    # else:
-    #     prompt = prompt_general
 
     actions = run_gpt_for_actions_baseline(prompt, model_name)
     return actions, prompt
@@ -3016,7 +3039,7 @@ num_trials = 10
 folder_name = "AlfW_o4_mini_high"
 result_name = folder_name
 
-## Run baseline models
+## Run PlanGen models
 # run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_alfworld("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name)
@@ -3027,10 +3050,10 @@ result_name = folder_name
 # run_baseline_alfworld_50("deepseek", folder_name=folder_name, result_name=result_name)
 # run_baseline_alfworld_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name)
 # run_baseline_alfworld_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name)
-run_baseline_alfworld_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name)
+# run_baseline_alfworld_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name)
 
 
-## Run PDDL generation models
+## Run PDDLego+ models
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
@@ -3040,13 +3063,13 @@ run_baseline_alfworld_50("o4-mini-2025-04-16", folder_name=folder_name, result_n
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model("deepseek", 7, 10, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 
-
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_iterative_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
+## Run PDDLego+ with multiple prompts
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="without_hint")
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="without_detailed_goal")
 # run_iterative_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
@@ -3055,6 +3078,7 @@ run_iterative_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_nam
 # run_iterative_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 
 
+## Run PDDLego+ with fixed domain file
 # run_iterative_model_fixed_df("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_fixed_df("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model_fixed_df("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
