@@ -1,4 +1,4 @@
-# pddlego-df
+# Zero-Shot Iterative Formalization and Planning  
 Iteratively predict PDDL domain file with LLMs
 
 ## Installation and Setup
