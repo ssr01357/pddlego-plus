@@ -25,6 +25,9 @@ We evaluate the performance of various language models with our framework:
 - GPT-4.1-2025-04-14
 - o3-mini-2025-01-31
 - o4-mini-2025-04-16
+- gpt-4o-2024-05-13
+- DeepSeek-R1-Distill-Llama-70B
+- DeepSeek-R1-Distill-Qwen-32B
 
 ## Repository Structure
 
@@ -57,14 +60,14 @@ PDDLEGO-PLUS/
 
 Our experiments test different configurations:
 
-- **Baseline Models**: Direct action generation without formal planning
+- **PlanGen**: Direct action generation without formal planning
 - **PDDLego+**: Our iterative PDDL formalization and planning approach
 - **Goal Types**:
   - `detailed`: Full goal description (simple + hint + goal description)
   - `subgoal`: simple prompt
   - `without_hint`: simple + goal description
   - `without_detailed_goal`: simple + hint
-- **Fixed Domain File**: Experiments controlling domain file generation from df_cache folder
+- **Fixed Domain File**: Experiments controlling domain files from df_cache folder
 
 ## Installation and Setup
 
@@ -78,7 +81,7 @@ conda activate pddlego-plus
 # Install dependencies
 pip install -r requirement.txt
 
-# enter your OpenAI API key and deepseek API key
+# Enter your OpenAI API key and deepseek API key
 export OPENAI_API_KEY="your_openai_api_key_here"
 export deepseek_API="your_deepseek_api_key_here"
 ```
@@ -88,20 +91,20 @@ export deepseek_API="your_deepseek_api_key_here"
 Run `interactive_CoinCollector.py` or `interactive_Alfworld.py` to launch experiments.
 Each script supports:
 - single-trial runs
-- fixed 100-trial batches (*_50 helpers)
+- fixed 100-trial batches (*_50)
 - fixed-df experiments that reuse a cached domain file
 
 All helper functions are already defined inside the two scripts; just call them when the file is executed as main.
 
 Before running, set
-- folder_name – sub-folder under output/ where raw logs will be written
-- result_name – stem for the CSV produced by the parser
+- folder_name: sub-folder under output/ where raw logs will be written
+- result_name: CSV file name logging the summary of each trial
 
 Simply uncomment the blocks you need.
 
 ### Available Models
 
-- `deepseek`: refer to `DeepSeek-R1-671B`
+- `deepseek`: representing `DeepSeek-R1-671B`
 - `o3-mini-2025-01-31`
 - `o4-mini-2025-04-16`
 - `gpt-4.1-2025-04-14`
