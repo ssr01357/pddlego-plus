@@ -1,35 +1,3 @@
-# import re
-
-# def count_successful_steps(filepath):
-#     with open(filepath, 'r') as f:
-#         log = f.read()
-
-#     # 1. Extract all `successful_actions` blocks
-#     successful_actions_blocks = re.findall(r"successful_actions:\s*\[(.*?)\]", log, re.DOTALL)
-#     all_successful_actions = [re.findall(r"'(.*?)'", block) for block in successful_actions_blocks]
-
-#     # total_successful = sum(len(actions) for actions in all_successful_actions)
-#     total_successful = len(all_successful_actions[-1])
-#     print("Total successful actions from all blocks:", total_successful)
-
-#     # 2. Extract last solver actions
-#     solver_actions_blocks = re.findall(r"Actions from solver\(df, pf\):\s*(\[.*?\]|None)", log)
-#     last_solver_block = solver_actions_blocks[-1] if solver_actions_blocks else None
-
-#     # 3. Check if trial succeeded
-#     lines = log.strip().splitlines()
-#     trial_succeeded = lines[-1].strip() in {"Coin found!", "Done!"}
-
-#     # 4. Add final step actions only if succeeded and solver result is not None
-#     if trial_succeeded and last_solver_block and last_solver_block != "None":
-#         last_actions = re.findall(r"'(.*?)'", last_solver_block)
-#         total_successful += len(last_actions)
-#         print("Added actions from last solver step:", len(last_actions))
-#     else:
-#         print("Last solver actions not counted due to failure or None.")
-
-#     return total_successful
-
 import os
 import re
 

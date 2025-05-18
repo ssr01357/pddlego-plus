@@ -1,80 +1,207 @@
-# Zero-Shot Iterative Formalization and Planning  
-Iteratively predict PDDL domain file with LLMs
+# PDDLego+: Zero-Shot Iterative Formalization and Planning in Partially Observable Environments
+
+This repository contains the implementation for our paper: "Zero-Shot Iterative Formalization and Planning in Partially Observable Environments".
+
+## Overview
+
+PDDLego+ is a framework that iteratively formalizes, plans, grows, and refines PDDL (Planning Domain Definition Language) representations in a zero-shot manner for partially observable environments. Unlike previous approaches that focus on fully observable environments, PDDLego+ tackles the more realistic and challenging scenario where complete information is not available, eliminating the need for access to existing trajectories.
+
+Our framework demonstrates:
+- Superior performance in textual simulated environments
+- Robustness against increasing problem complexity
+- Interpretable domain knowledge that benefits future tasks
+
+## Environments
+
+We evaluate PDDLego+ on two textual simulated environments:
+
+1. **CoinCollector**: A grid-world environment where an agent must collect coins while avoiding obstacles
+2. **ALFWorld**: A household environment with complex object interactions
+
+## Models
+
+We evaluate the performance of various language models with our framework:
+- DeepSeek-R1-671B
+- GPT-4.1-2025-04-14
+- o3-mini-2025-01-31
+- o4-mini-2025-04-16
+
+## Repository Structure
+
+```
+PDDLEGO-PLUS/
+├── df_cache/                    # Cache for fixed domain file operations
+├── Figures/                     # Generated figures in paper
+├── output/                      # Trial output log
+│   ├── Alfworld/               # ALFWorld trial logs
+│   ├── CoinCollector/          # CoinCollector trial logs
+│   ├── Alfworld.csv            # Complete ALFWorld trial data
+│   ├── Alfworld_summary.csv    # Summarized ALFWorld metrics
+│   ├── CoinCollector.csv       # Complete CoinCollector trial data
+│   └── CoinCollector_summary.csv # Summarized CoinCollector metrics
+├── test_files/                  # Test files for development
+├── .gitignore                  
+├── domain.pddl                  # Example PDDL domain file
+├── extract_actions.py           # Script to extract actions count from trial results
+├── interactive_Alfworld.py      # Main ALFWorld environment interaction code
+├── interactive_CoinCollector.py # Main CoinCollector environment interaction code
+├── LICENSE                      
+├── plan.txt                     # Example generated plan
+├── problem.pddl                 # Example PDDL problem file
+├── requirement.txt              # Dependencies and requirements
+├── results_parse_final.py       # Script to parse trial data into metrics
+└── visualize_pddlego+.ipynb     # Jupyter notebook for result visualization
+```
+
+## Experiment Configuration
+
+Our experiments test different configurations:
+
+- **Baseline Models**: Direct action generation without formal planning
+- **PDDLego+**: Our iterative PDDL formalization and planning approach
+- **Goal Types**:
+  - `detailed`: Full goal description (simple + hint + goal description)
+  - `subgoal`: simple prompt
+  - `without_hint`: simple + goal description
+  - `without_detailed_goal`: simple + hint
+- **Fixed Domain File**: Experiments controlling domain file generation from df_cache folder
 
 ## Installation and Setup
 
-### 1. Python Version
-It is recommended to use Python 3.8+ (though 3.7+ will likely work).
-
-### 2. Required Python Packages
-Install the following packages via pip:
+Our implementation uses Python scripts including `interactive_Alfworld.py` and `interactive_CoinCollector.py`. Results are analyzed using Python scripts including `results_parse_final.py` and `extract_actions.py`. The visualizations are done in Jupyter Notebook `visualize_pddlego+.ipynb`.
 
 ```bash
-pip install requests
-pip install pandas
-pip install openai
-pip install backoff
-pip install textworld-express
+# Create a virtual environment (optional but recommended)
+conda create -n pddlego-plus python=3.10
+conda activate pddlego-plus
+
+# Install dependencies
+pip install -r requirement.txt
+
+# enter your OpenAI API key and deepseek API key
+export OPENAI_API_KEY="your_openai_api_key_here"
+export deepseek_API="your_deepseek_api_key_here"
 ```
 
-- requests: For making HTTP requests (used by the OpenAI / other APIs).
-- pandas: For data manipulation and analysis.
-- openai: For interacting with the OpenAI API (GPT models, etc.).
-- backoff: For handling retry logic (especially helpful with API rate limits).
-- textworld-express: For the Coin Collector environment and text-based environment simulations.
-  
-### 3. VAL (Parser/Validate) Setup
-This project uses VAL for parsing and validating PDDL domain/problem files.
+## Usage
 
-a. Obtain VAL: Clone the VAL repository from GitHub and compile it:
+Run `interactive_CoinCollector.py` or `interactive_Alfworld.py` to launch experiments.
+Each script supports:
+- single-trial runs
+- fixed 100-trial batches (*_50 helpers)
+- fixed-df experiments that reuse a cached domain file
+
+All helper functions are already defined inside the two scripts; just call them when the file is executed as main.
+
+Before running, set
+- folder_name – sub-folder under output/ where raw logs will be written
+- result_name – stem for the CSV produced by the parser
+
+Simply uncomment the blocks you need.
+
+### Available Models
+
+- `deepseek`: refer to `DeepSeek-R1-671B`
+- `o3-mini-2025-01-31`
+- `o4-mini-2025-04-16`
+- `gpt-4.1-2025-04-14`
+- `gpt-4o-2024-05-13`
+- `DeepSeek-R1-Distill-Llama-70B`
+- `DeepSeek-R1-Distill-Qwen-32B`
+
+### Available Goal Types
+
+- `detailed`: Full detailed goal specification
+- `subgoal`: Simplified goal specification
+- `without_hint`: Goal without hints (ALFWorld only)
+- `without_detailed_goal`: Simplified goal without details (ALFWorld only)
+
+### Running CoinCollector Experiments
+
+Run the `interactive_CoinCollector.py` script with the following functions:
+
+```python
+# Configuration variables
+model = "your_chosen_model"
+folder_name = "results_folder"
+result_name = "results_file"
+i = 0  # starting trial index
+num_trials = 10  # number of trials for single trial runs
+
+# PDDLego+ with detailed goals (single trial batch)
+run_iterative_model(model, i, i+num_trials, folder_name, result_name, goal_type="detailed")
+
+# PDDLego+ with detailed goals (fixed 100 trials)
+run_iterative_model_50(model, folder_name, result_name, goal_type="detailed")
+
+# PDDLego+ with simple prompt (fixed 100 trials)
+run_iterative_model_50(model, folder_name, result_name, goal_type="subgoal")
+
+# PlanGen baseline (single trial batch)
+run_baseline_model(model, i, i+num_trials, folder_name, result_name)
+
+# PlanGen baseline (fixed 100 trials)
+run_baseline_model_50(model, folder_name, result_name)
+
+# PDDLego+ with fixed domain file (100 trials)
+run_iterative_model_fixed_df(model, folder_name, result_name, goal_type="detailed")
+```
+
+### Running ALFWorld Experiments
+
+Run the `interactive_Alfworld.py` script with the following functions:
+
+```python
+# Configuration variables
+model = "your_chosen_model"
+folder_name = "results_folder"
+result_name = "results_file"
+i = 0  # starting trial index
+num_trials = 10  # number of trials for single trial runs
+
+# PDDLego+ with detailed goals (single trial batch)
+run_iterative_model(model, i, i+num_trials, folder_name, result_name, goal_type="detailed")
+
+# PDDLego+ with detailed goals (fixed 100 trials)
+run_iterative_model_50(model, folder_name, result_name, goal_type="detailed")
+
+# PDDLego+ with simple prompt (fixed 100 trials)
+run_iterative_model_50(model, folder_name, result_name, goal_type="subgoal")
+
+# PDDLego+ with simple+hint prompt (fixed 100 trials)
+run_iterative_model_50(model, folder_name, result_name, goal_type="without_detailed_goal")
+
+# PDDLego+ with simple+goal prompt (fixed 100 trials)
+run_iterative_model_50(model, folder_name, result_name, goal_type="without_hint")
+
+# PlanGen baseline (single trial batch)
+run_baseline_alfworld(model, i, i+num_trials, folder_name, result_name)
+
+# PlanGen baseline (fixed 100 trials)
+run_baseline_alfworld_50(model, folder_name, result_name)
+
+# PDDLego+ with fixed domain file (100 trials)
+run_iterative_model_fixed_df(model, folder_name, result_name, goal_type="detailed")
+```
+
+### Analyzing Results
+
+#### Parsing Results
+
+Modify the `file_name` variable in `results_parse_final.py` to generate summary statistics:
 
 ```bash
-git clone https://github.com/KCL-Planning/VAL.git
-cd VAL
-make
+python results_parse_final.py
 ```
 
-The build artifacts (e.g., Parser, Validate) will typically appear under ./build/<platform>/<build-type>/bin/.
+#### Extracting Action Data
 
-b. Update Paths:
-
-- By default, the code uses an absolute path for the Parser executable.
-- In your code, set parser_path (and similarly for Validate, if you use it) to point to where VAL’s Parser and Validate binaries are located.
-
-### 4. OpenAI API Key
-If you plan to use OpenAI’s GPT models:
-
-- Sign up for an OpenAI account.
-- Retrieve your OpenAI API Key from the API Keys page.
-- In your code (or environment variables), set openai.api_key = "YOUR_API_KEY" or use an environment variable like:
+Update the folder path in `extract_actions.py` to analyze action counts:
 
 ```bash
-export OPENAI_API_KEY="YOUR_API_KEY"
+python extract_actions.py
 ```
 
-## Code Usage
-### 1. Run interactive_CC.ipynb
-Run this notebook in compiler e.g. VSCode for close source models
+#### Visualizing Results
 
-- This notebook demonstrates usage of:
-  - The solver settings
-  - OpenAI GPT settings
-  - VAL setup
-  - Other helper functions
-    
-- Modifying the common_path:
-  - You can edit common_path in the notebook or Python scripts to point to your domain/problem files or to reference them differently (relative path instead of absolute).
-    
-- PDDL on CoinCollector:
-  - The main example is in the “PDDL on CoinCollector” section, which uses TextWorldExpress.
-  - Simply run the relevant cells to see how the environment is created, how the steps and loops are executed, and how prompts and actions are handled.
-
-- Frameworks in the Repository
-  - Basic Prompts: Contains fundamental environment settings.
-  - Baseline: Shows how GPT can directly generate plans.
-  - PDDL on CoinCollector: The primary workflow that uses GPT to generate domain files and/or plans, then tests them in the TextWorldExpress environment.
-
-### 2. Run interactive_CC_server.py
-Run this python file on server for open source models
-
-
+Use the Jupyter notebook `visualize_pddlego+.ipynb` to generate visualizations of experimental results.

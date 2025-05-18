@@ -1354,7 +1354,7 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
     return df, pf, err, prompt
 
 
-def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None, goal_type="detailed", goal=goal):
+def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None, goal=goal):
     # prompt_general = f"""
     #     You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
     #     Your task is to interact with objects and receptacles to complete a goal step by step.
@@ -1509,8 +1509,8 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
             "actions": ["action1"]
         }}
     """
-    if goal_type == 'detailed':
-        prompt = prompt_detailed
+    # if goal_type == 'detailed':
+    prompt = prompt_detailed
     # elif goal_type == 'subgoal':
     #     prompt = prompt_subgoal
     # else:
@@ -2585,7 +2585,7 @@ def run_iterative_model_fixed_df(model_name = "deepseek-ai/DeepSeek-R1-Distill-L
                         retry += 1
 
 
-def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=5, folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
+def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=5, folder_name="08_031825_alfworld", result_name="alfworld_results"):
     for trial in range(start_trial, end_trial):
         retry = 0
         while retry < 2:  # allow up to 2 attempts per trial
@@ -2693,7 +2693,6 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                             valid_actions,
                             overall_memory,
                             large_loop_error_message,
-                            goal_type=goal_type,
                             goal=goal
                         )
 
@@ -2796,7 +2795,7 @@ def run_baseline_alfworld(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     f.write(f"Trial {trial} (Attempt {retry+1}) failed: {str(e)}\n")
                 retry += 1
 
-def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", folder_name="08_031825_alfworld", result_name="alfworld_results", goal_type="detailed"):
+def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", folder_name="08_031825_alfworld", result_name="alfworld_results"):
     trial = 0
     for game_type, game_lst in game_dictionary.items():
         # game_lst_sep = game_lst*2
@@ -2907,7 +2906,6 @@ def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-7
                                 valid_actions,
                                 overall_memory,
                                 large_loop_error_message,
-                                goal_type=goal_type,
                                 goal=goal
                             )
 
@@ -2999,7 +2997,7 @@ def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-7
                     with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
                         writer = csv.writer(csvfile)
                         model_type = 'baseline' # PDDL
-                        data_row = [today, model_name, model_type, game_type, goal_type, trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
+                        data_row = [today, model_name, model_type, game_type, "detailed", trial, succeed, len(trial_record)-1,trial_record[-1][-1], trial_record]
                         writer.writerow(data_row)
 
                     break
@@ -3019,17 +3017,17 @@ folder_name = "AlfW_o4_mini_high"
 result_name = folder_name
 
 ## Run baseline models
-# run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name)
+# run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name)
+# run_baseline_alfworld("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name)
+# run_baseline_alfworld("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name)
+# run_baseline_alfworld("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 
-# run_baseline_alfworld_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld_50("deepseek", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_baseline_alfworld_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_baseline_alfworld_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_baseline_alfworld_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name)
+# run_baseline_alfworld_50("deepseek", folder_name=folder_name, result_name=result_name)
+# run_baseline_alfworld_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name)
+# run_baseline_alfworld_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name)
+run_baseline_alfworld_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name)
 
 
 ## Run PDDL generation models

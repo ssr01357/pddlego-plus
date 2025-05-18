@@ -2459,7 +2459,7 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 
 i = 0
-num_trials = 10
+num_trials = 1
 folder_name = "CC_o4_mini_high"
 result_name = folder_name
 
