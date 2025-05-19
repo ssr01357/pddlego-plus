@@ -111,6 +111,10 @@ Simply uncomment the blocks you need.
 - `gpt-4o-2024-05-13`
 - `DeepSeek-R1-Distill-Llama-70B`
 - `DeepSeek-R1-Distill-Qwen-32B`
+  
+Note: 
+1. Remember to uncomment the server block at the beginning of the python file to run models on server.
+2. If you want to run other OpenAI models, remember to add model names in the `close_source_model_lists`.
 
 ### Available Goal Types
 
