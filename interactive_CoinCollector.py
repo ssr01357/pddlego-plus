@@ -74,9 +74,9 @@ def get_action_from_pddl(df, pf):
     result = run_solver(df, pf, "dual-bfws-ffparser")
     action = result['output']['plan']
     err_2 = result['stderr']
-    return map_actions(action), err_2
+    return map_actions(action), err_2 # 액션의 리스트( = 플랜)을 반환함
 
-
+# 왜 structured output기능 안쓰는지...?
 # LLM set up
 close_source_model_lists = ['gpt-4o-2024-05-13','o3-mini-2025-01-31',"gpt-4.1-2025-04-14","o4-mini-2025-04-16"]
 def run_llm_model(prompt, model_name):
@@ -1153,9 +1153,9 @@ def merge_problem_files_code(old_pf: str, new_pf: str) -> str:
 def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
     # trial_record = 
     # structured_info_record = "output/summary"
-    for trial in range(start_trial, end_trial):
+    for trial in range(start_trial, end_trial): #이건 정답 찾을때까지
         retry = 0
-        while retry < 2:  # allow up to 2 attempts per trial
+        while retry < 2:  # 이건 에러처리용 다시시도
             try:
                 coin_found = False
                 today = date.today()
@@ -1183,11 +1183,14 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                     f.write(f"Gold path: {env.getGoldActionSequence()} \n")
                     f.write(f"Valid Actions: {infos['validActions']} \n")
                     f.write(f"taskDescription: {infos['taskDescription']} \n")
+                # 이건 첫번째 tries(=laarger loop에서 쓰임)
+
+                
 
                 # task_description = infos['taskDescription']
                 valid_actions = sorted(infos['validActions'])
-                valid_actions.remove('look around')
-                valid_actions.remove('inventory')
+                valid_actions.remove('look around') # 이건 초반에 항상 초기값
+                valid_actions.remove('inventory') # 이건 필요없으니까?
 
                 MAX_STEPS = 20
 
@@ -1225,15 +1228,15 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                         within_step_tries += 1
 
                         if within_step_tries > 1: # second or third ... time in the larger loop
-                            # reset env by refilling successful actions (stupid but useful)
+                            # reset env by refilling successful actions (stupid but useful)<- 왜 이렇게 하지?
                             env = TextWorldExpressEnv(envStepLimit=100)
                             NUM_LOCATIONS = 11
                             env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-                            obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-                            for successful_action in successful_actions:
-                                obs, reward, done, infos = env.step(successful_action)
+                            obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True) # 여기서 나온 obs, infos는 쓰지도 않음
+                            for successful_action in successful_actions: # 초기화 다음, 어떤 행동을 취하기 시작한 후부터의 아웃풋에 주목
+                                obs, reward, done, infos = env.step(successful_action) # <-아... 앞단계에서 검증된거 한꺼번에 넣어주고 다음 action찾으려고
 
-                        action_queue = [] # reset action_queue
+                        action_queue = [] # reset action_queue ()
                         tem_action_queue = []
                         tem_memory = ""
 
@@ -1243,11 +1246,11 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                 f.write(f'Small Loop, action_queue: {action_queue} \n')
                             start_checkpoint = False
 
-                            if not action_queue:
+                            if not action_queue: # when start_checkpoint = True before. 이 시점에는 무조건 false긴 하지만 그래도 이 while문 들어올 때
                                 if obs_queue:
                                     brief_obs = "\n".join(obs_queue)
                                     obs_queue = []
-                                action = ""
+                                action = "" # 스몰루프를 시작할 때마다, action을 초기화한다...그리고 obs_queue 리스트도 초기화한다....이게 llm먹이는 기본 단위인가?
                                 
                                 if not df and not pf: # First step no need duplicates detection
                                     num_tries = 0
@@ -1401,7 +1404,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
         for seed_num in range(4):
             trial += 1
             retry = 0
-            while retry < 2:  # allow up to 2 attempts per trial
+            while retry < 2:  # allow up to 2 attempts per trial 
                 try:
                     coin_found = False
                     today = date.today()
@@ -1898,7 +1901,7 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
         while retry < 2:  # allow up to 2 attempts per trial
             try:
                 coin_found = False
-                today = "2025-04-22" #date.today()
+                today = date.today()
 
                 fixed_model_name = model_name.replace("/","_")
 
@@ -2491,17 +2494,18 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 i = 0
 num_trials = 1
-folder_name = "CC_o4_mini_high"
+# folder_name = "CC_o4_mini_high"
+folder_name = "yewon_test"
 result_name = folder_name
 
 ## Run PlanGen models
-# run_baseline_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name)
+run_baseline_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 
-# run_baseline_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name)
+run_baseline_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("deepseek", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name)
@@ -2509,7 +2513,7 @@ result_name = folder_name
 
 
 ## Run PDDLego+ models
-# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
