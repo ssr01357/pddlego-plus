@@ -1,3 +1,6 @@
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1, 2, 3"
+
 import time
 from datetime import date
 import csv
@@ -5,8 +8,11 @@ import json
 import asyncio
 import re
 
-# from kani import Kani
-# from kani.engines.huggingface import HuggingEngine
+from dotenv import load_dotenv
+load_dotenv()
+
+from kani import Kani
+from kani.engines.huggingface import HuggingEngine
 
 import subprocess
 import requests
@@ -14,23 +20,32 @@ import requests
 from textworld_express import TextWorldExpressEnv
 
 from openai import OpenAI
-import os
 
-client = OpenAI()
+import torch
+import gc
 
-## Run models on server
-# lockfile = "/tmp/coincollector.lock"
+_hf_engine_cache: dict[str, HuggingEngine] = {}
+_kani_cache: dict[str, Kani] = {}
 
-# if os.path.exists(lockfile):
-#     print("Another instance is already running.")
-#     sys.exit(1)
+def clear_cuda_memory(model_name):
+    """Clears a specific model from cache and frees GPU memory."""
+    global _kani_cache, _hf_engine_cache
 
-# with open(lockfile, 'w') as f:
-#     f.write(str(os.getpid()))
-    
-# # set up HuggingFace and Kani
-# _hf_engine_cache: dict[str, HuggingEngine] = {}
-# _kani_cache: dict[str, Kani] = {}
+    if model_name in _kani_cache:
+        del _kani_cache[model_name]
+        # print(f"Cleared {model_name} from kani_cache.")
+
+    if model_name in _hf_engine_cache:
+        del _hf_engine_cache[model_name]
+        # print(f"Cleared {model_name} from hf_engine_cache.")
+
+    # Force Python's garbage collector to run
+    gc.collect()
+
+    # Tell PyTorch to release unused cached memory
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        # print("Cleared CUDA cache.")
 
 # Solver set up
 def run_solver(domain_file, problem_file, solver, max_retries=3):
@@ -63,66 +78,63 @@ def run_solver(domain_file, problem_file, solver, max_retries=3):
             return celery_result.json()['result']
 
         except Exception as e:
-            print(f"Error encountered: {e}. Retrying in 5 seconds... (Attempt {retries+1}/{max_retries})")
+            last_error = e  # Save the last exception
+            print(
+                f"Error encountered: {e}.\n"
+                f"Attempt {retries + 1}/{max_retries}. Retrying in 5 seconds...\n"
+                f"--- Failing Domain File ---\n{domain_file}\n"
+                f"--- Failing Problem File ---\n{problem_file}\n"
+                f"--------------------------"
+            )
             retries += 1
             time.sleep(5)
 
-    raise RuntimeError("Max retries exceeded. Failed to get result from solver.")
+    # If all retries fail, raise a detailed error
+    raise RuntimeError(
+        f"Max retries exceeded. Failed to get result from solver.\n"
+        f"Last error: {last_error}\n"
+        f"--- Failing Domain File ---\n{domain_file}\n"
+        f"--- Failing Problem File ---\n{problem_file}\n"
+        f"--------------------------"
+    )
 
 def get_action_from_pddl(df, pf):
-    # run_fast_downward(path_to_df, path_to_pf)
     result = run_solver(df, pf, "dual-bfws-ffparser")
     action = result['output']['plan']
     err_2 = result['stderr']
     return map_actions(action), err_2 # 액션의 리스트( = 플랜)을 반환함
 
-# 왜 structured output기능 안쓰는지...?
-# LLM set up
-close_source_model_lists = ['gpt-4o-2024-05-13','o3-mini-2025-01-31',"gpt-4.1-2025-04-14","o4-mini-2025-04-16"]
-def run_llm_model(prompt, model_name):
-
-    if model_name in close_source_model_lists: # closed source LLMs
+OPENAI_MODELS_LIST = ['gpt-4o','o3-mini',"gpt-4.1","o4-mini"]
+def run_llm(prompt, model_name):
+    if any(model_name.startswith(base) for base in OPENAI_MODELS_LIST): 
         client = OpenAI()
-        if model_name == 'o4-mini-2025-04-16':
-            response = client.chat.completions.create(
-                    model="o4-mini-2025-04-16",
-                    reasoning_effort="high",
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ]
-                )
-        else:
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=[{"role": "user", "content": prompt}],
-                # max_completion_tokens=2048,
-                top_p=1,
-                frequency_penalty=0,
-                presence_penalty=0
-            )
 
+        params = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+
+        if re.match(r'^o\d+', model_name):  
+            params["reasoning_effort"] = "high"
+
+        response = client.chat.completions.create(**params)
         response_content = response.choices[0].message.content
 
-        if response_content.startswith("```json"):
-            response_content = response_content.lstrip("```json").rstrip("```").strip()
-
-        result = json.loads(response_content)
-        # try:
-        #     result = json.loads(response_content)
-        # except json.JSONDecodeError:
-        #     return None, None
+        try:
+            result = json.loads(response_content)
+        except json.JSONDecodeError:
+            try:
+                repaired_content = repair_json(response_content)
+                result = json.loads(repaired_content)
+            except json.JSONDecodeError:  
+                raise ValueError(
+                    f"Model response is not valid JSON after repair attempts:\n{response_content}"
+                )
 
         df = result.get("df", None)
         pf = result.get("pf", None)
-
-        # if df is None or pf is None:
-        #     raise ValueError("Missing 'df' or 'pf' in the response. Check the prompt or the model output.")
-
         return df, pf
-
+    
     elif model_name == 'deepseek':
         deepseekAPI = os.getenv("deepseek_API")
         client = OpenAI(api_key=deepseekAPI, base_url="https://api.deepseek.com")
@@ -138,39 +150,22 @@ def run_llm_model(prompt, model_name):
 
         response_content = response.choices[0].message.content
 
-        if response_content.startswith("```json"):
-            response_content = response_content.lstrip("```json").rstrip("```").strip()
-
-        result = json.loads(response_content)
+        try:
+            result = json.loads(response_content)
+        except json.JSONDecodeError:
+            try:
+                repaired_content = repair_json(response_content)
+                result = json.loads(repaired_content)
+            except json.JSONDecodeError:  
+                raise ValueError(
+                    f"Model response is not valid JSON after repair attempts:\n{response_content}"
+                )
         df = result.get("df", None)
         pf = result.get("pf", None)
-
-        # if df is None or pf is None:
-        #     raise ValueError("Missing 'df' or 'pf' in the response. Check the prompt or the model output.")
-
         return df, pf
     
     else: # Open source LLMs
-        """
-        Run a prompt against a HuggingFace model using Kani and parse out
-        'df' and 'pf' from the JSON response. Raises ValueError if missing keys.
-        """
         async def _ask_model(model_name, user_prompt):
-            # Create Hugging Face engine
-            # engine = HuggingEngine(
-            #     model_id=model_name,
-            #     use_auth_token=True, 
-            #     model_load_kwargs={
-            #         "device_map": "auto",
-            #         "trust_remote_code": True
-            #     }
-            # )
-            # # Wrap in Kani
-            # ai = Kani(engine, system_prompt="")
-
-            # # Send the user prompt and get the response string
-            # response = await ai.chat_round_str(user_prompt)
-            # return response
             if model_name not in _hf_engine_cache:
                 engine = HuggingEngine(
                     model_id=model_name,
@@ -181,110 +176,57 @@ def run_llm_model(prompt, model_name):
                 _kani_cache[model_name] = Kani(engine, system_prompt="")
             ai = _kani_cache[model_name]
             return await ai.chat_round_str(user_prompt)
-        # Because Kani calls are async, we need to run them in an event loop
+     
         response_content = asyncio.run(_ask_model(model_name, prompt))
 
-        # deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-        # print(response_content)
-        if '</think>' in response_content:
-            response_content = response_content[response_content.find('</think>')+10:]
-
-        if response_content.startswith("```json"):
-            response_content = (
-                response_content
-                .lstrip("```json")
-                .rstrip("```")
-                .strip()
-            )
-        
-        def extract_json_block(text):
-            # This pattern captures everything between ```json and the next ```
-            # (?s) makes '.' match newlines as well
-            pattern = r"(?s)```json\s*(.*?)\s*```"
-            
-            match = re.search(pattern, text)
-            if match:
-                # match.group(1) contains the content between the backticks
-                return match.group(1).strip()
-            return text
-        # print(response_content)
-        response_content = extract_json_block(response_content)
-        # print(response_content)
-
-        # # If your model returns a JSON block wrapped in triple backticks, strip them
-        
-
-        # Attempt to parse the JSON response
         try:
             result = json.loads(response_content)
         except json.JSONDecodeError:
-            raise ValueError(
-                f"Model response is not valid JSON:\n{response_content}"
-            )
+            try:
+                repaired_content = repair_json(response_content)
+                result = json.loads(repaired_content)
+            except json.JSONDecodeError:  
+                raise ValueError(
+                    f"Model response is not valid JSON after repair attempts:\n{response_content}"
+                )
 
-        # Extract fields
-        df = result.get("df", None)
-        pf = result.get("pf", None)
-
-        # if df is None or pf is None:
-        #     raise ValueError(
-        #         "Missing 'df' or 'pf' in the response. Check your prompt or the model's output."
-        #     )
-
+        df = result.get("df")
+        pf = result.get("pf")
         return df, pf
 
-# Set up baseline model: get actions directly from model
-def run_gpt_for_actions_baseline(prompt, model_name):
-    if model_name in close_source_model_lists: # closed source LLMs
-        client = OpenAI()
-        if model_name == 'o4-mini-2025-04-16':
-            response = client.chat.completions.create(
-                    model="o4-mini-2025-04-16",
-                    reasoning_effort="high",
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompt
-                        }
-                    ]
-                )
-        else:
-            response = client.chat.completions.create(
-                model=model_name,
-                messages=[{"role": "user", "content": prompt}],
-                # max_completion_tokens=2048,
-                top_p=1,
-                frequency_penalty=0,
-                presence_penalty=0
-            )
 
+
+# Set up baseline model: get actions directly from model
+def run_llm_for_actions_baseline(prompt, model_name):
+    if any(model_name.startswith(base) for base in OPENAI_MODELS_LIST): 
+        client = OpenAI()
+
+        params = {
+            "model": model_name,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+
+        if re.match(r'^o\d+', model_name):  
+            params["reasoning_effort"] = "high"
+
+        response = client.chat.completions.create(**params)
         response_content = response.choices[0].message.content
 
-        if response_content.startswith("```json"):
-            response_content = response_content.lstrip("```json").rstrip("```").strip()
-
-        def extract_json_block(text):
-            # This pattern captures everything between ```json and the next ```
-            # (?s) makes '.' match newlines as well
-            pattern = r"(?s)```json\s*(.*?)\s*```"
-            
-            match = re.search(pattern, text)
-            if match:
-                # match.group(1) contains the content between the backticks
-                return match.group(1).strip()
-            return text
-
-        response_content = extract_json_block(response_content)
-
-        result = json.loads(response_content)
+        try:
+            result = json.loads(response_content)
+        except json.JSONDecodeError:
+            try:
+                repaired_content = repair_json(response_content)
+                result = json.loads(repaired_content)
+            except json.JSONDecodeError:  
+                raise ValueError(
+                    f"Model response is not valid JSON after repair attempts:\n{response_content}"
+                )
 
         actions = result.get("actions", None)
 
-        if actions is None:
-            raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
-
         return actions
-
+    
     elif model_name == 'deepseek':
         deepseekAPI = os.getenv("deepseek_API")
         client = OpenAI(api_key=deepseekAPI, base_url="https://api.deepseek.com")
@@ -300,48 +242,23 @@ def run_gpt_for_actions_baseline(prompt, model_name):
 
         response_content = response.choices[0].message.content
 
-        if response_content.startswith("```json"):
-            response_content = response_content.lstrip("```json").rstrip("```").strip()
-
-        def extract_json_block(text):
-            # This pattern captures everything between ```json and the next ```
-            # (?s) makes '.' match newlines as well
-            pattern = r"(?s)```json\s*(.*?)\s*```"
+        try:
+            result = json.loads(response_content)
+        except json.JSONDecodeError:
+            try:
+                repaired_content = repair_json(response_content)
+                result = json.loads(repaired_content)
+            except json.JSONDecodeError:  
+                raise ValueError(
+                    f"Model response is not valid JSON after repair attempts:\n{response_content}"
+                )
             
-            match = re.search(pattern, text)
-            if match:
-                # match.group(1) contains the content between the backticks
-                return match.group(1).strip()
-            return text
-
-        response_content = extract_json_block(response_content)
-        result = json.loads(response_content)
         actions = result.get("actions", None)
-        if actions is None:
-            raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
+
         return actions
         
     else: # Open source LLMs
-        """
-        Run a prompt against a HuggingFace model using Kani and parse out
-        'df' and 'pf' from the JSON response. Raises ValueError if missing keys.
-        """
         async def _ask_model(model_name, user_prompt):
-            # Create Hugging Face engine
-            # engine = HuggingEngine(
-            #     model_id=model_name,
-            #     use_auth_token=True, 
-            #     model_load_kwargs={
-            #         "device_map": "auto",
-            #         "trust_remote_code": True
-            #     }
-            # )
-            # # Wrap in Kani
-            # ai = Kani(engine, system_prompt="")
-
-            # # Send the user prompt and get the response string
-            # response = await ai.chat_round_str(user_prompt)
-            # return response
             if model_name not in _hf_engine_cache:
                 engine = HuggingEngine(
                     model_id=model_name,
@@ -352,142 +269,147 @@ def run_gpt_for_actions_baseline(prompt, model_name):
                 _kani_cache[model_name] = Kani(engine, system_prompt="")
             ai = _kani_cache[model_name]
             return await ai.chat_round_str(user_prompt)
-
-        # Because Kani calls are async, we need to run them in an event loop
+ 
         response_content = asyncio.run(_ask_model(model_name, prompt))
-
-        # deepseek-ai/DeepSeek-R1-Distill-Llama-70B
-        # print(response_content)
-        if '</think>' in response_content:
-            response_content = response_content[response_content.find('</think>')+10:]
-
-        if response_content.startswith("```json"):
-            response_content = (
-                response_content
-                .lstrip("```json")
-                .rstrip("```")
-                .strip()
-            )
-        
-        def extract_json_block(text):
-            # This pattern captures everything between ```json and the next ```
-            # (?s) makes '.' match newlines as well
-            pattern = r"(?s)```json\s*(.*?)\s*```"
-            
-            match = re.search(pattern, text)
-            if match:
-                # match.group(1) contains the content between the backticks
-                return match.group(1).strip()
-            return text
-
-        response_content = extract_json_block(response_content)
 
         try:
             result = json.loads(response_content)
         except json.JSONDecodeError:
-            raise ValueError(
-                f"Model response is not valid JSON:\n{response_content}"
-            )
+            try:
+                repaired_content = repair_json(response_content)
+                result = json.loads(repaired_content)
+            except json.JSONDecodeError:  
+                raise ValueError(
+                    f"Model response is not valid JSON after repair attempts:\n{response_content}"
+                )
 
         actions = result.get("actions", None)
 
-        # if actions is None:
-        #     raise ValueError("Missing 'actions' in the response. Check the prompt or the model output.")
-
         return actions
+
+def repair_json(content):
+    
+    # Clean up the content
+    content = _remove_think_tags(content)
+    content = _extract_json_from_codeblock(content)
+    content = _fix_triple_quoted_strings(content)
+    content = _extract_json_from_plain_text(content)
+    content = _fix_unescaped_characters(content)
+    content = _strip_formatting(content)
+
+    return content
+
+def _remove_think_tags(text):
+    think_end = text.find('</think>')
+    if think_end != -1:
+        return text[think_end + 8:].strip()  # len('</think>') = 8
+    return text
+
+def _extract_json_from_codeblock(text):
+    # Try to match ```json ... ``` first
+    patterns = [
+        r"(?s)```json\s*(.*?)\s*```",  # JSON code block
+        r"(?s)```\s*(.*?)\s*```"        # Generic code block
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1).strip()
+    
+    return text
+
+def _extract_json_from_plain_text(text: str) -> str:
+    last_brace_pos = text.rfind('{')
+    if last_brace_pos != -1:
+        return text[last_brace_pos:]
+
+    return text
+
+def _fix_triple_quoted_strings(text):
+    pattern = r'"(\w+)":\s*"""(.*?)"""'
+    
+    def escape_for_json(match):
+        key = match.group(1)
+        content = match.group(2)
+        
+        # Escape special characters for JSON
+        replacements = [
+            ('\\', '\\\\'),  # Backslashes first
+            ('"', '\\"'),    # Quotes
+            ('\n', '\\n'),   # Newlines
+            ('\r', '\\r'),   # Carriage returns
+            ('\t', '\\t'),   # Tabs
+        ]
+        
+        for old, new in replacements:
+            content = content.replace(old, new)
+        
+        return f'"{key}": "{content}"'
+    
+    return re.sub(pattern, escape_for_json, text, flags=re.DOTALL)
+
+def _fix_unescaped_characters(text: str) -> str:
+    # Set a limit to prevent infinite loops on unfixable errors
+
+    text = text.replace('\\\n', '\\n') # llama
+
+    max_attempts = 200
+    
+    for i in range(max_attempts):
+        try:
+            # Try to parse the text. If it works, we're done.
+            json.loads(text)
+            return text
+        except json.JSONDecodeError as e:
+            # On error, the parser tells us exactly where the problem is.
+            # e.pos is the character index of the error.
+            
+            # Case 1: An unescaped newline or other control character in a string
+            if "Invalid control character" in e.msg:
+                # Replace the problematic character with its escaped version
+                char_to_escape = text[e.pos]
+                if char_to_escape == '\n':
+                    escaped_char = '\\n'
+                elif char_to_escape == '\r':
+                    escaped_char = '\\r'
+                elif char_to_escape == '\t':
+                    escaped_char = '\\t'
+                else:
+                    # If it's some other control character, just remove it
+                    escaped_char = ''
+                
+                text = text[:e.pos] + escaped_char + text[e.pos + 1:]
+
+            # Case 2: An unescaped double quote in a string
+            elif "Unterminated string" in e.msg:
+                # This often means a '"' is inside a string without being escaped.
+                # We'll try to find the quote just before the error and escape it.
+                text = text[:e.pos - 1] + '\\' + text[e.pos - 1:]
+
+            # If we can't fix it, break the loop and return the broken text
+            else:
+                break
+    return text
+
+def _strip_formatting(text):
+    # Remove leading/trailing markdown json markers
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[7:]  # len("```json") = 7
+    if text.endswith("```"):
+        text = text[:-3]
+    
+    # Remove surrounding quotes if present
+    text = text.strip()
+    if text.startswith("'") and text.endswith("'") and len(text) > 1:
+        text = text[1:-1]
+    
+    return text.strip()
 
 # VAL setup
 # common_path = "/Users/krystalgong/Documents/GitHub/pddlego-df/"
 
-def file_to_path(domain_content, problem_content, domain_filename="domain.pddl", problem_filename="problem.pddl"):
-    with open(domain_filename, 'w') as domain_file:
-        domain_file.write(domain_content)
-    
-    with open(problem_filename, 'w') as problem_file:
-        problem_file.write(problem_content)
-
-    path_to_df = domain_filename
-    path_to_pf = problem_filename
-
-    return path_to_df, path_to_pf
-
-def plan_to_path(plan, plan_filename="plan.txt"):
-    with open(plan_filename, 'w') as plan_file:
-        plan_file.write(plan)
-
-    path_to_plan = "plan.txt"
-
-    return path_to_plan
-
-def run_pddl_parser(domain_file, problem_file=None):
-    # Define the path to your Parser executable
-    parser_path = "VAL-master/build/macos64/Release/bin/Parser"
-    domain_path, problem_path = file_to_path(domain_file, problem_file)
-    
-    # Check if both domain and problem files are provided
-    if problem_file:
-        command = [parser_path, domain_path, problem_path]
-    else:
-        command = [parser_path, domain_path]
-    
-    try:
-        # Run the Parser and capture the output
-        result = subprocess.run(command, capture_output=True, text=True)
-        
-        # Check if there is any error
-        if result.returncode != 0:
-            print(f"Error: {result.stderr}")
-            return None
-        
-        # Return the stdout (output) of the parser
-        return result.stdout
-    
-    except FileNotFoundError as e:
-        print(f"Parser not found: {e}")
-        return None
-
-def validate_pddl(domain_file, problem_file, plan=None):
-    # The path to the Validate executable
-    validate_executable = "VAL-master/build/macos64/Release/bin/Validate"
-
-    domain_path, problem_path = file_to_path(domain_file, problem_file)
-    plan_path = plan_to_path(plan)
-    
-    # Construct the command
-    command = [validate_executable, "-v", domain_path, problem_path]
-
-    # plan should be a txt file
-    if plan_path:
-      command.append(plan_path)
-    
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=True)
-        
-        print("Validation Output:\n", result.stdout)
-        
-    except subprocess.CalledProcessError as e:
-        print("Error:\n", e.stderr)
-
-# Currently ignoring err_1, i.e. not using this function. Something wrong with VAL...
-def error_message(domain_file, problem_file):
-    # Run Parser and get error message
-    pass
-    parser_output = run_pddl_parser(domain_file, problem_file)
-    err_message = ''
-    if parser_output:
-        output_lst = parser_output.split('\n')
-        # err_message = ''
-        error = False
-        for i in output_lst:
-            if i.startswith('Errors:') or error:
-                if "Warning" in i:
-                    continue
-                error = True
-                err_message += i
-                err_message += '\n'
-                
-    # err_message = err_message.replace('/Users/krystalgong/Documents/GitHub/pddlego-df/', '')
-    return err_message
 
 
 # Additional functions
@@ -534,249 +456,18 @@ def detect_duplicates(action_lst, threshold):
     # If no sequence repeats up to the threshold, return False
     return False
 
-# Edit mode but NOT USING it now...
-def apply_edit_domain(prev_df, edit_json):
-    output = []
-    predicate_section = False
-    action_name = None
-    
-    for line in prev_df.split("\n"):
-        stripped_line = line.strip()
-        
-        # Handle predicates
-        if "(:predicates" in line:
-            predicate_section = True
-            output.append(line)
-        elif predicate_section and stripped_line == ")":
-            predicate_section = False
-            # Add new predicates if specified
-            if "predicates" in edit_json and "add" in edit_json["predicates"]:
-                for pred in edit_json["predicates"]["add"]:
-                    output.append("    " + pred)
-            output.append(line)
-        elif predicate_section:
-            if "predicates" in edit_json:
-                if "replace" in edit_json["predicates"] and stripped_line in edit_json["predicates"]["replace"]:
-                    output.append("    " + edit_json["predicates"]["replace"][stripped_line])
-                elif "delete" in edit_json["predicates"] and stripped_line in edit_json["predicates"]["delete"]:
-                    continue
-                else:
-                    output.append(line)
-            else:
-                output.append(line)
-        
-        # Handle actions
-        elif "(:action" in line:
-            action_name = stripped_line.split()[1]
-            output.append(line)
-        elif action_name and ":precondition" in stripped_line:
-            if "action" in edit_json and action_name in edit_json["action"] and "precondition" in edit_json["action"][action_name]:
-                # Replace precondition
-                output.append("        :precondition " + " ".join(edit_json["action"][action_name]["precondition"]))
-                while ")" not in stripped_line:  # Skip lines until end of precondition
-                    stripped_line = next(prev_df.split("\n")).strip()
-            else:
-                output.append(line)
-        elif action_name and ":effect" in stripped_line:
-            if "action" in edit_json and action_name in edit_json["action"] and "effect" in edit_json["action"][action_name]:
-                # Replace effect
-                output.append("        :effect " + " ".join(edit_json["action"][action_name]["effect"]))
-                while ")" not in stripped_line:  # Skip lines until end of effect
-                    stripped_line = next(prev_df.split("\n")).strip()
-            else:
-                output.append(line)
-        else:
-            output.append(line)
-    
-    return "\n".join(output)
-
-def apply_edit_problem(prev_pf, edit_json):
-    output = []
-    obj_section = False
-    init_section = False
-    goal_section = False
-    
-    for line in prev_pf.split("\n"):
-        stripped_line = line.strip()
-        
-        # Handle objects
-        if "(:objects" in line:
-            obj_section = True
-            output.append(line)
-        elif obj_section and stripped_line == ")":
-            obj_section = False
-            # Add new objects if specified
-            if "objects" in edit_json and "add" in edit_json["objects"]:
-                for obj in edit_json["objects"]["add"]:
-                    output.append("        " + obj)
-            output.append(line)
-        elif obj_section:
-            if "objects" in edit_json:
-                if "replace" in edit_json["objects"] and stripped_line in edit_json["objects"]["replace"]:
-                    output.append("        " + edit_json["objects"]["replace"][stripped_line])
-                elif "delete" in edit_json["objects"] and stripped_line in edit_json["objects"]["delete"]:
-                    continue
-                else:
-                    output.append(line)
-            else:
-                output.append(line)
-        
-        # Handle init
-        elif "(:init" in line:
-            init_section = True
-            output.append(line)
-        elif init_section and stripped_line == ")":
-            init_section = False
-            # Add new init statements if specified
-            if "init" in edit_json and "add" in edit_json["init"]:
-                for init in edit_json["init"]["add"]:
-                    output.append("        " + init)
-            output.append(line)
-        elif init_section:
-            if "init" in edit_json:
-                if "replace" in edit_json["init"] and stripped_line in edit_json["init"]["replace"]:
-                    output.append("        " + edit_json["init"]["replace"][stripped_line])
-                elif "delete" in edit_json["init"] and stripped_line in edit_json["init"]["delete"]:
-                    continue
-                else:
-                    output.append(line)
-            else:
-                output.append(line)
-        
-        # Handle goal
-        elif "(:goal" in line:
-            goal_section = True
-            output.append(line)
-        elif goal_section:
-            goal_section = False
-            if "goal" in edit_json:
-                output.append("        " + " ".join(edit_json["goal"]))
-                while ")" not in stripped_line:  # Skip lines until end of goal
-                    stripped_line = next(prev_pf.split("\n")).strip()
-            else:
-                output.append(line)
-        
-        else:
-            output.append(line)
-    
-    return "\n".join(output)
-
-def apply_edit(prev_df, prev_pf, edit_json_df, edit_json_pf):
-    update_df, update_pf = prev_df, prev_pf  # Default to original if no changes are made
-    if edit_json_df == {}:
-        update_df = apply_edit_domain(prev_df, edit_json_df)
-    if edit_json_pf == {}:
-        update_pf = apply_edit_problem(prev_pf, edit_json_pf)
-    return update_df, update_pf
-
-def llm_to_pddl_check_delta(obs, taken_action, prev_df="", prev_pf=""):
-
-    prompt_edit = """
-        Please provide the edit output in JSON format, including the edit suggestions for a domain file as 'df' and the edit suggestions for a problem file as 'pf'. 
-        The output format should be: {{"df": "...", "pf": "..."}}
-        You will modify the following df and pf using add, delete, and replace operations (in a JSON format). 
-        You SHOULD NOT provide a domain file and a problem file directly.
-        If you think the current observation is correct with your previous generated files, then provide empty JSON: 
-        {{"df": "{}", "pf": "{}"}}
-        This is the structure for df edit file if you think this observation is different from previous generated version, remember to add bracket:
-        {
-        "predicates": {
-            "add": ["(predicates to add)"],
-            "replace": {"(old)": "(new)"},
-            "delete": ["(predicates to delete)"]
-            },
-        "action": {
-            "open-door": {
-                "precondition": ["(entire full new precondition for open-door)"], # directly replace the whole precondition
-                "effect": ["(entire full new effect for open-door)"] # so as effect
-                },
-            "move": {
-                "precondition": []
-                "effect": []
-                }
-            }
-        }
-        This is the structure for pf edit file:
-        {
-        "objects": {
-            "add": [],
-            "replace": {},
-            "delete": []
-            },
-        "init": {
-            "add": [],
-            "replace": {},
-            "delete": []
-            },
-        "goal": ["(entire full new goal)"]
-        }
-    """
-
-    prompt_obs_action = f"""
-        Background: You are in an environment that you explore step by step. You must build and update PDDL files of the environment based on only your observations. 
-        Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
-        Your task is always to keep exploration and go to a location you have not visited yet.
-
-        Here is your last action {taken_action} and the observation after taking that action: {summarize_obs(obs)}
-    """ 
-
-    prompt_prev_files = f"""
-        This is previous domain file: {prev_df}
-        This is previous problem file: {prev_pf}
-    """
-        
-    prompt = prompt_edit + prompt_obs_action + prompt_prev_files
-
-    if "I'm not sure what you mean." in summarize_obs(obs) and "open door" in taken_action:
-        print('\n There is no door here or there is nothing in this direction.') # how to utilize this? previous obs. how to extract locations
-        prompt += 'Additionally notes: You are trying to open a door but there is no door here or there is nothing in this direction.'
-    elif "open door" in taken_action:
-        prompt += "\n Additionally notes: You opened a door and revealing the above place. \
-            Is this what you are expecting based on your previous generated problem file? \
-            If yes, you should generate the empty edit json file! \
-            If not, do you need to edit the previous file, mainly problem file? Provide the edit json! Thank you!"
-
-    edit_json_df, edit_json_pf = run_llm_model(prompt) # , model_name
-
-    print(edit_json_df, edit_json_pf)
-
-    edit_json_df = json.loads(edit_json_df)
-    edit_json_pf = json.loads(edit_json_pf)
-    
-    zero_edit = {
-        "objects": {
-            "add": [],
-            "replace": {},
-            "delete": []
-            },
-        "init": {
-            "add": [],
-            "replace": {},
-            "delete": []
-            },
-        "goal": []
-        }
-    if edit_json_pf == zero_edit or edit_json_pf == {}:
-        return True, 0, 0
-    
-    # print("Edit json:",edit_json_df, edit_json_pf)
-    print(edit_json_df, edit_json_pf, type(edit_json_pf), edit_json_pf=={})
-    df, pf = apply_edit(prev_df, prev_pf, edit_json_df, edit_json_pf)
-
-    return False, df, pf
-
 
 # Prompt modify and main function
-env = TextWorldExpressEnv(envStepLimit=100)
-NUM_LOCATIONS = 11
-env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
-obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-valid_actions = sorted(infos['validActions'])
-valid_actions.remove('look around')
-valid_actions.remove('inventory')
+# env = TextWorldExpressEnv(envStepLimit=100)
+# NUM_LOCATIONS = 11
+# env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+# obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+# valid_actions = sorted(infos['validActions'])
+# valid_actions.remove('look around')
+# valid_actions.remove('inventory')
 # brief_obs = "Action: look around\n" + summarize_obs(obs)+'\n'
 
-def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message = None, goal_type='detailed'):
+def llm_to_pddl(model_name, brief_obs, valid_actions, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message = None, goal_type='detailed'):
     prompt_format = f"""
         Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
         The format should strictly be:
@@ -921,13 +612,14 @@ def llm_to_pddl(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev
         prompt += prompt_duplicate_note
 
 
-    if edit:
-        edit_json_df, edit_json_pf = run_llm_model(prompt, model_name)
-        # print("Edit json:",edit_json_df, edit_json_pf)
-        df, pf = apply_edit(prev_df, prev_pf, edit_json_df, edit_json_pf)
-        # print("New df and pf:", df, pf)
-    else:
-        df, pf = run_llm_model(prompt, model_name)
+    # if edit:
+    #     edit_json_df, edit_json_pf = run_llm(prompt, model_name)
+    #     # print("Edit json:",edit_json_df, edit_json_pf)
+    #     df, pf = apply_edit(prev_df, prev_pf, edit_json_df, edit_json_pf)
+    #     # print("New df and pf:", df, pf)
+    # else:
+    #     df, pf = run_llm(prompt, model_name)
+    df, pf = run_llm(prompt, model_name)
 
     err = None #error_message(df, pf)
     # check err and its df & pf here:
@@ -955,11 +647,11 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
     """
     #  "while you should only generate one action at a time" "actions": ["action1"]
     #  "actions": ["action1", "action2", ...]
-    actions = run_gpt_for_actions_baseline(prompt, model_name)
+    actions = run_llm_for_actions_baseline(prompt, model_name)
     return actions
 
 
-def llm_to_pddl_fixed_df(model_name, brief_obs, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message=None, goal_type='detailed', df=None):
+def llm_to_pddl_fixed_df(model_name, brief_obs, valid_actions, prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message=None, goal_type='detailed', df=None):
     prompt = f"""
         Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL problem file as 'pf'. The domain file is fixed and will be provided below. It should not be modified.
         The format should strictly be:
@@ -1029,7 +721,7 @@ def llm_to_pddl_fixed_df(model_name, brief_obs, prev_df="", prev_pf="", prev_err
         prompt += prompt_duplicate_note
 
 
-    df_None, pf = run_llm_model(prompt, model_name)
+    df_None, pf = run_llm(prompt, model_name)
 
     err = None #error_message(df, pf)
     # check err and its df & pf here:
@@ -1068,7 +760,7 @@ def generate_problem_file_from_observation(observation, model_name="o3-mini", do
             "pf": "CONTENT_OF_THE_PROBLEM_FILE"
         }}
     """
-    result = run_llm_model(prompt, model_name=model_name)
+    result = run_llm(prompt, model_name=model_name)
     # Assuming run_llm_model returns a dict with key "pf"
     pf = result.get("pf") if isinstance(result, dict) else result[1]
     return pf
@@ -1096,7 +788,7 @@ def merge_problem_files_llm(old_problem_file, new_problem_file, model_name="o3-m
         }}
     """
 
-    _df, merged_pf = run_llm_model(prompt, model_name=model_name)
+    _df, merged_pf = run_llm(prompt, model_name=model_name)
     return merged_pf
 
 def merge_problem_files_code(old_pf: str, new_pf: str) -> str:
@@ -1254,7 +946,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                 
                                 if not df and not pf: # First step no need duplicates detection
                                     num_tries = 0
-                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs) # error 1 here
+                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions) # error 1 here
                                     action, err_2 = get_action_from_pddl(df, pf) # error 2 here
                                     with open(file_name, "a") as f:
                                         f.write(f"--Small Loop--: {num_tries} \n")
@@ -1264,7 +956,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                         f.write(f"Actions from solver(df, pf): {action} \n")
 
                                     while not action and num_tries < 5:
-                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, False, edit)
+                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, False, edit)
                                         action, err_2 = get_action_from_pddl(df, pf)
                                         num_tries += 1
                                         
@@ -1278,7 +970,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                     num_tries = 0
                                     # Every time read new error message from larger loop
                                     # In llm_to_pddl, detect if new large loop error message exists
-                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message) # need to add new error message
+                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message) # need to add new error message
                                     action, err_2 = get_action_from_pddl(df, pf)
 
                                     with open(file_name, "a") as f:
@@ -1289,7 +981,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                         f.write(f"Actions from solver(df, pf): {action} \n")
 
                                     while not action and num_tries < 5:
-                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message)
+                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message)
                                         action, err_2 = get_action_from_pddl(df, pf)
                                         num_tries += 1
 
@@ -1395,7 +1087,12 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
             except Exception as e:
                 error_log_path = f"output/{folder_name}/errors.txt"
                 with open(error_log_path, "a") as f:
-                    f.write(f"Trial {trial} (Attempt {retry+1}) model ({model_name}) failed: {str(e)}\n")
+                    log_message = (
+                        f"[PDDLego+] Trial {trial} (Attempt {retry+1}) | "
+                        f"Model: {model_name} | Goal Type: {goal_type} | "
+                        f"Failed: {str(e)}\n"
+                    )
+                    f.write(log_message)
                 retry += 1
 
 def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
@@ -1498,7 +1195,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
                                     
                                     if not df and not pf: # First step no need duplicates detection
                                         num_tries = 0
-                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, goal_type=goal_type) # error 1 here
+                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, goal_type=goal_type) # error 1 here
                                         action, err_2 = get_action_from_pddl(df, pf) # error 2 here
                                         with open(file_name, "a") as f:
                                             f.write(f"--Small Loop--: {num_tries} \n")
@@ -1508,7 +1205,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
                                             f.write(f"Actions from solver(df, pf): {action} \n")
 
                                         while not action and num_tries < 5:
-                                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, False, edit, goal_type=goal_type)
+                                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions,df, pf, err, err_2, True, False, edit, goal_type=goal_type)
                                             action, err_2 = get_action_from_pddl(df, pf)
                                             num_tries += 1
                                             
@@ -1522,7 +1219,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
                                         num_tries = 0
                                         # Every time read new error message from larger loop
                                         # In llm_to_pddl, detect if new large loop error message exists
-                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type) # need to add new error message
+                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type) # need to add new error message
                                         action, err_2 = get_action_from_pddl(df, pf)
 
                                         with open(file_name, "a") as f:
@@ -1533,7 +1230,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
                                             f.write(f"Actions from solver(df, pf): {action} \n")
 
                                         while not action and num_tries < 5:
-                                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type)
+                                            df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type)
                                             action, err_2 = get_action_from_pddl(df, pf)
                                             num_tries += 1
 
@@ -1639,7 +1336,12 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
                 except Exception as e:
                     error_log_path = f"output/{folder_name}/errors.txt"
                     with open(error_log_path, "a") as f:
-                        f.write(f"Trial {trial} (Attempt {retry+1}) model ({model_name}) failed: {str(e)}\n")
+                        log_message = (
+                            f"[PDDLego+ 50] Trial {trial} (Attempt {retry+1}) | "
+                            f"Num Locations: {NUM_LOCATIONS} | Model: {model_name} | Goal Type: {goal_type} | "
+                            f"Failed: {str(e)}\n"
+                        )
+                        f.write(log_message)
                     retry += 1
 
 def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
@@ -1749,7 +1451,7 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
                                         
                                         if not pf: # First step no need duplicates detection
                                             num_tries = 0
-                                            pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, goal_type=goal_type, df=df) # error 1 here
+                                            pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, valid_actions, goal_type=goal_type, df=df) # error 1 here
                                             action, err_2 = get_action_from_pddl(df, pf) # error 2 here
                                             with open(file_name, "a") as f:
                                                 f.write(f"--Small Loop--: {num_tries} \n")
@@ -1759,7 +1461,7 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
                                                 f.write(f"Actions from solver(df, pf): {action} \n")
 
                                             while not action and num_tries < 5:
-                                                pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, df, pf, err, err_2, True, False, edit, goal_type=goal_type, df=df)
+                                                pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, False, edit, goal_type=goal_type, df=df)
                                                 action, err_2 = get_action_from_pddl(df, pf)
                                                 num_tries += 1
                                                 
@@ -1773,7 +1475,7 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
                                             num_tries = 0
                                             # Every time read new error message from larger loop
                                             # In llm_to_pddl, detect if new large loop error message exists
-                                            pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type, df=df) # need to add new error message
+                                            pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, valid_actions, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type, df=df) # need to add new error message
                                             action, err_2 = get_action_from_pddl(df, pf)
 
                                             with open(file_name, "a") as f:
@@ -1784,7 +1486,7 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
                                                 f.write(f"Actions from solver(df, pf): {action} \n")
 
                                             while not action and num_tries < 5:
-                                                pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type, df=df)
+                                                pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type, df=df)
                                                 action, err_2 = get_action_from_pddl(df, pf)
                                                 num_tries += 1
 
@@ -1888,12 +1590,16 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
                         break
 
                     except Exception as e:
-                        error_log_path = f"output/6_0430_CC/{folder_name}/errors.txt"
+                        error_log_path = f"output/{folder_name}/errors.txt"
                         with open(error_log_path, "a") as f:
-                            f.write(f"Trial {trial} (Attempt {retry+1}) model ({model_name}) failed: {str(e)}\n")
+                            # Add a specific prefix and more context
+                            log_message = (
+                                f"[PDDLego+ Fixed DF] Trial {trial} (Attempt {retry+1}) | "
+                                f"Num Locations: {NUM_LOCATIONS} | Model: {model_name} | Goal Type: {goal_type} | "
+                                f"Failed: {str(e)}\n"
+                            )
+                            f.write(log_message)
                         retry += 1
-
-
 
 def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031825_alfworld", result_name="alfworld_results"):
     for trial in range(start_trials, end_trials):
@@ -2085,7 +1791,12 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
             except Exception as e:
                 error_log_path = f"output/{folder_name}/errors.txt"
                 with open(error_log_path, "a") as f:
-                    f.write(f"Trial {trial} (Attempt {retry+1}) failed: {str(e)}\n")
+                    log_message = (
+                        f"[Baseline] Trial {trial} (Attempt {retry+1}) | "
+                        f"Model: {model_name} | "
+                        f"Failed: {str(e)}\n"
+                    )
+                    f.write(log_message)
                 retry += 1
 
 def run_baseline_model_50(model_name, folder_name="08_031825_alfworld", result_name="alfworld_results"):
@@ -2279,10 +1990,14 @@ def run_baseline_model_50(model_name, folder_name="08_031825_alfworld", result_n
                 except Exception as e:
                     error_log_path = f"output/{folder_name}/errors.txt"
                     with open(error_log_path, "a") as f:
-                        f.write(f"Trial {trial} (Attempt {retry+1}) failed: {str(e)}\n")
+                        # Add a prefix and more context
+                        log_message = (
+                            f"[Baseline 50] Trial {trial} (Attempt {retry+1}) | "
+                            f"Num Locations: {NUM_LOCATIONS} | Model: {model_name} | "
+                            f"Failed: {str(e)}\n"
+                        )
+                        f.write(log_message)
                     retry += 1
-
-
 
 def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B", start_trial=0, end_trial=11, merging_method="llm"):
     """
@@ -2493,19 +2208,26 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 
 
 i = 0
-num_trials = 1
+num_trials = 3
 # folder_name = "CC_o4_mini_high"
-folder_name = "yewon_test"
+folder_name = "yewon_coin_0722"
 result_name = folder_name
-
+model_id1 = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+model_id2 = "Qwen/Qwen3-32B"
+model_id3 = "meta-llama/Llama-3.3-70B-Instruct"
 ## Run PlanGen models
-run_baseline_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name)
+run_baseline_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name)
+clear_cuda_memory(model_id1)
+run_baseline_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name)
+clear_cuda_memory(model_id2)
+run_baseline_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name)
+clear_cuda_memory(model_id3)
 # run_baseline_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 
-run_baseline_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name)
+# run_baseline_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("o3-mini-2025-01-31", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("deepseek", folder_name=folder_name, result_name=result_name)
 # run_baseline_model_50("gpt-4.1-2025-04-14", folder_name=folder_name, result_name=result_name)
@@ -2513,7 +2235,13 @@ run_baseline_model_50("gpt-4o-2024-05-13", folder_name=folder_name, result_name=
 
 
 ## Run PDDLego+ models
-run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+clear_cuda_memory(model_id1)
+run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+clear_cuda_memory(model_id2)
+run_iterative_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+clear_cuda_memory(model_id3)
+# run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
