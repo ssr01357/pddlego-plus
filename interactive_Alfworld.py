@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1, 2, 3"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "4, 5, 6, 7"
 
 import time
 from datetime import date
@@ -1372,13 +1372,13 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                     5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}
                 game_type = problem_type_dic[problem_id] # set game_type here!
                 print(f"Playing {problem_id}: {problem}")
-                domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl")
+                domain = pjoin(ALFWORLD_DATA, "logic", "alfred.pddl") # domain file
                 grammar = pjoin(ALFWORLD_DATA, "logic", "alfred.twl2")
                 GAME_LOGIC = {
                         "pddl_domain": open(domain).read(),
                         "grammar": open(grammar).read(),
                     }
-                pddl_file = os.path.join(problem, 'initial_state.pddl')
+                pddl_file = os.path.join(problem, 'initial_state.pddl') # problem file
                 json_file = os.path.join(problem, 'traj_data.json')
                 with open(json_file, 'r') as f:
                     traj_data = json.load(f)
@@ -2709,7 +2709,7 @@ def run_baseline_alfworld_50(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-7
 i = 0
 num_trials = 2
 # folder_name = "AlfW_o4_mini_high"
-folder_name = "yewon_alfworld_0722_test"
+folder_name = "yewon_alfworld_0812_test"
 result_name = folder_name
 model_id1 = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
 model_id2 = "Qwen/Qwen3-32B"
@@ -2724,8 +2724,8 @@ model_id3 = "meta-llama/Llama-3.3-70B-Instruct"
 # clear_cuda_memory(model_id2)
 
 # run_baseline_alfworld(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name)
-run_iterative_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-clear_cuda_memory(model_id3)
+# run_iterative_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# clear_cuda_memory(model_id3)
 
 # run_baseline_alfworld("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # run_baseline_alfworld("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name)
@@ -2743,7 +2743,7 @@ clear_cuda_memory(model_id3)
 ## Run PDDLego+ models
 # run_iterative_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("gpt-4o-2024-05-13", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
