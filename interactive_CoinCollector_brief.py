@@ -22,68 +22,20 @@ from textworld_express import TextWorldExpressEnv
 from openai import OpenAI
 from utils import clear_cuda_memory, repair_json
 from prompts import *
-
+from solver import run_solver
 
 _hf_engine_cache: dict[str, HuggingEngine] = {}
 _kani_cache: dict[str, Kani] = {}
 OPENAI_MODELS_LIST = ['gpt-4o','o3-mini',"gpt-4.1","o4-mini"]
+ENV_PARAMS = {"gameName": "coin", "gameParams": "numLocations=11,numDistractorItems=0,includeDoors=1,limitInventorySize=0"}
 
-def run_solver(domain_file, problem_file, solver, max_retries=3):
-    # domain_file = open(f'domain.pddl').read()
-    # problem_file = open(f'problem.pddl').read()
-
-    req_body = {"domain" : domain_file, "problem" : problem_file}
-
-    retries = 0
-
-    while retries < max_retries:
-        try:
-            # Send job request to solve endpoint
-            solve_request_url = requests.post(
-                f"https://solver.planning.domains:5001/package/{solver}/solve", 
-                json=req_body
-            ).json()
-
-            # Query the result in the job
-            celery_result = requests.post(
-                'https://solver.planning.domains:5001' + solve_request_url['result']
-            )
-
-            while celery_result.json().get("status", "") == 'PENDING':
-                time.sleep(0.5)
-                celery_result = requests.post(
-                    'https://solver.planning.domains:5001' + solve_request_url['result']
-                )
-
-            return celery_result.json()['result']
-
-        except Exception as e:
-            last_error = e  # Save the last exception
-            print(
-                f"Error encountered: {e}.\n"
-                f"Attempt {retries + 1}/{max_retries}. Retrying in 5 seconds...\n"
-                f"--- Failing Domain File ---\n{domain_file}\n"
-                f"--- Failing Problem File ---\n{problem_file}\n"
-                f"--------------------------"
-            )
-            retries += 1
-            time.sleep(5)
-
-    # If all retries fail, raise a detailed error
-    raise RuntimeError(
-        f"Max retries exceeded. Failed to get result from solver.\n"
-        f"Last error: {last_error}\n"
-        f"--- Failing Domain File ---\n{domain_file}\n"
-        f"--- Failing Problem File ---\n{problem_file}\n"
-        f"--------------------------"
-    )
 
 def get_action_from_pddl(df, pf):
-    result = run_solver(df, pf, "dual-bfws-ffparser")
-    action = result['output']['plan']
-    err_2 = result['stderr']
-    return map_actions(action), err_2 # 액션의 리스트( = 플랜)을 반환함
-
+    result = run_solver(df, pf, "dual-bfws-ffparser", validate_with_val=True)
+    plan_text = result["output"].get("plan") or ""
+    # If there is no plan, return (None, logs) so the outer loop behaves as before.
+    mapped = map_actions(plan_text) if plan_text else None
+    return mapped, result["stderr"]
 
 def run_llm(prompt, model_name):
     if any(model_name.startswith(base) for base in OPENAI_MODELS_LIST): 
@@ -311,12 +263,10 @@ def detect_duplicates(action_lst, threshold):
     # If no sequence repeats up to the threshold, return False
     return False
 
-def llm_to_pddl(model_name, brief_obs, valid_actions, prev_df="", prev_pf="", prev_err="", prev_err_2=None, have_error=False, have_duplicate=False, edit=False, overall_memory=None, large_loop_error_message = None, goal_type='detailed'):
+def llm_to_pddl(model_name, brief_obs, valid_actions, prev_df="", prev_pf="", prev_err="", have_duplicate=False, overall_memory=None, large_loop_error_message = None, goal_type='detailed'):
 
-    if not edit:
-        prompt = prompt_format.format()
-    else:
-        prompt = prompt_edit.format()
+   
+    prompt = prompt_format.format()
 
     # all prompts should have observations and actions
     if goal_type == 'detailed':
@@ -327,32 +277,19 @@ def llm_to_pddl(model_name, brief_obs, valid_actions, prev_df="", prev_pf="", pr
     if prev_df and prev_pf:
         prompt += prompt_prev_files.format(prev_df=prev_df, prev_pf=prev_pf, overall_memory=overall_memory)
 
-        if not have_error:
-            prompt += prompt_new_obs.format()
-        else:
-            prompt += prompt_error_parser.format(prev_err=prev_err, prev_err_2=prev_err_2)
-        
         if large_loop_error_message:
             prompt += prompt_simulation_error.format(large_loop_error_message=large_loop_error_message)
+        if prev_err:
+            prompt += prompt_error_parser.format(prev_err=prev_err)
 
+        prompt += "\nNow rewrite both the domain and problem files with the minimal fix.\n"
     if have_duplicate:
         # print('You have duplicated error message!!')
         prompt += prompt_duplicate_note.format()
 
-
-    # if edit:
-    #     edit_json_df, edit_json_pf = run_llm(prompt, model_name)
-    #     # print("Edit json:",edit_json_df, edit_json_pf)
-    #     df, pf = apply_edit(prev_df, prev_pf, edit_json_df, edit_json_pf)
-    #     # print("New df and pf:", df, pf)
-    # else:
-    #     df, pf = run_llm(prompt, model_name)
     df, pf = run_llm(prompt, model_name)
 
-    err = None #error_message(df, pf)
-    # check err and its df & pf here:
-    # ....
-    return df, pf, err, prompt
+    return df, pf, prompt
 
 
 def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory=None, large_loop_error_message=None):
@@ -368,8 +305,7 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
 
 # Main functions here:
 def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
-    # trial_record = 
-    # structured_info_record = "output/summary"
+   
     for trial in range(start_trial, end_trial): #이건 정답 찾을때까지
         retry = 0
         while retry < 2:  # 이건 에러처리용 다시시도
@@ -392,8 +328,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                 trial_record = []
                 
                 env = TextWorldExpressEnv(envStepLimit=100)
-                NUM_LOCATIONS = 11
-                env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=10,includeDoors=1,limitInventorySize=0")
+                env.load(**ENV_PARAMS)
                 obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
                 with open(file_name, "a") as f:  # "w" creates a new file or overwrites an existing file
                     f.write(f"Observations: {obs} \n") 
@@ -401,8 +336,6 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                     f.write(f"Valid Actions: {infos['validActions']} \n")
                     f.write(f"taskDescription: {infos['taskDescription']} \n")
                 # 이건 첫번째 tries(=larger loop에서 쓰임)
-
-                
 
                 # task_description = infos['taskDescription']
                 valid_actions = sorted(infos['validActions'])
@@ -422,7 +355,6 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                 pf = ""
                 all_actions = []
                 successful_actions = []
-                edit = False
                 end_game = False
 
                 overall_memory = brief_obs
@@ -447,8 +379,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                         if within_step_tries > 1: # second or third ... time in the larger loop
                             # reset env by refilling successful actions (stupid but useful)<- 왜 이렇게 하지?
                             env = TextWorldExpressEnv(envStepLimit=100)
-                            NUM_LOCATIONS = 11
-                            env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+                            env.load(**ENV_PARAMS)
                             obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True) # 여기서 나온 obs, infos는 쓰지도 않음
                             for successful_action in successful_actions: # 초기화 다음, 어떤 행동을 취하기 시작한 후부터의 아웃풋에 주목
                                 obs, reward, done, infos = env.step(successful_action) # <-아... 앞단계에서 검증된거 한꺼번에 넣어주고 다음 action찾으려고
@@ -467,27 +398,25 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                 if obs_queue:
                                     brief_obs = "\n".join(obs_queue)
                                     obs_queue = []
-                                action = "" # 스몰루프를 시작할 때마다, action을 초기화한다...그리고 obs_queue 리스트도 초기화한다....이게 llm먹이는 기본 단위인가?
+                                action = ""
                                 
                                 if not df and not pf: # First step no need duplicates detection
                                     num_tries = 0
-                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions) # error 1 here
-                                    action, err_2 = get_action_from_pddl(df, pf) # error 2 here
+                                    df, pf, prompt = llm_to_pddl(model_name, brief_obs, valid_actions) # error 1 here
+                                    action, err = get_action_from_pddl(df, pf) # error 2 here
                                     with open(file_name, "a") as f:
                                         f.write(f"--Small Loop--: {num_tries} \n")
-                                        f.write(f"Error: {err} \n")
                                         f.write(f"Prompt: {prompt} \n") 
                                         f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
                                         f.write(f"Actions from solver(df, pf): {action} \n")
 
                                     while not action and num_tries < 5:
-                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, False, edit)
-                                        action, err_2 = get_action_from_pddl(df, pf)
+                                        df, pf, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, False)
+                                        action, err = get_action_from_pddl(df, pf)
                                         num_tries += 1
                                         
                                         with open(file_name, "a") as f:
                                             f.write(f"--Small Loop--: {num_tries} \n")
-                                            f.write(f"Error: {err} \n")
                                             f.write(f"Prompt: {prompt} \n") 
                                             f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
                                             f.write(f"Actions from solver(df, pf): {action} \n")
@@ -495,24 +424,22 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                     num_tries = 0
                                     # Every time read new error message from larger loop
                                     # In llm_to_pddl, detect if new large loop error message exists
-                                    df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message) # need to add new error message
-                                    action, err_2 = get_action_from_pddl(df, pf)
+                                    df, pf, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, "", detect_duplicates(all_actions, 3), overall_memory, large_loop_error_message) # need to add new error message
+                                    action, err = get_action_from_pddl(df, pf)
 
                                     with open(file_name, "a") as f:
                                         f.write(f"--Small Loop--: {num_tries} \n")
-                                        f.write(f"Error: {err} \n")
                                         f.write(f"Prompt: {prompt} \n") 
                                         f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
                                         f.write(f"Actions from solver(df, pf): {action} \n")
 
                                     while not action and num_tries < 5:
-                                        df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message)
-                                        action, err_2 = get_action_from_pddl(df, pf)
+                                        df, pf, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, detect_duplicates(all_actions, 3), overall_memory, large_loop_error_message)
+                                        action, err = get_action_from_pddl(df, pf)
                                         num_tries += 1
 
                                         with open(file_name, "a") as f:
                                             f.write(f"--Small Loop--: {num_tries} \n")
-                                            f.write(f"Error: {err} \n")
                                             f.write(f"Prompt: {prompt} \n") 
                                             f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
                                             f.write(f"Actions from solver(df, pf): {action} \n")
@@ -533,9 +460,6 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                 f.write(f"Current action_queue: {action_queue} \n")
                             
                             taken_action = action_queue.pop(0)
-                            # Feedback from plan-environment interaction
-                            # err_validate = validate_pddl(df, pf, taken_action)
-                            # print(err_validate)
 
                             obs, reward, done, infos = env.step(taken_action)
 
@@ -644,8 +568,8 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
                 trial_record = []
 
                 env = TextWorldExpressEnv(envStepLimit=100)
-                NUM_LOCATIONS = 11
-                env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+
+                env.load(**ENV_PARAMS)
                 obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
                 with open(file_name, "a") as f:
                     f.write(f"Observations: {obs} \n")
@@ -689,8 +613,7 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
 
                         if within_step_tries > 1:  # For subsequent tries, reset the environment
                             env = TextWorldExpressEnv(envStepLimit=100)
-                            NUM_LOCATIONS = 11
-                            env.load(gameName="coin", gameParams=f"numLocations={NUM_LOCATIONS},numDistractorItems=0,includeDoors=1,limitInventorySize=0")
+                            env.load(**ENV_PARAMS)
                             obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
                             for act in successful_actions:
                                 obs, reward, done, infos = env.step(act)
@@ -822,9 +745,9 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
 
 
 i = 0
-num_trials = 2
+num_trials = 4
 # folder_name = "CC_o4_mini_high"
-folder_name = "yewon_coin_0815_harder"
+folder_name = "yewon_coin_0815_newsolver4"
 result_name = folder_name
 model_id1 = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
 model_id2 = "Qwen/Qwen3-32B"
