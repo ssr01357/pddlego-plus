@@ -1,0 +1,4408 @@
+Observations: You are in the kitchen. In one part of the room you see a stove. There is also an oven. You also see a fridge that is closed. In another part of the room you see a counter, that has nothing on it. In one part of the room you see a kitchen cupboard that is closed. There is also a cutlery drawer that is closed. You also see a trash can that is closed. In another part of the room you see a dishwasher that is closed. In one part of the room you see a dining chair, that has nothing on it. 
+To the South you see a closed patio door. To the West you see a closed plain door.  
+Gold path: ['look around', 'open door to south', 'open door to west', 'move west', 'move east', 'move west', 'move east', 'move south', 'open door to west', 'move north', 'move south', 'move east', 'open door to north', 'move north', 'take coin'] 
+Valid Actions: ['look around', 'close door to west', 'move west', 'open door to south', 'open door to west', 'inventory', 'move south', 'close door to south'] 
+taskDescription: Your task is to search the environment and find the coin.  Once you find the coin, take it. 
+brief_obs: Action: look around
+You are in the kitchen. To the South you see a closed patio door. To the West you see a closed plain door. 
+ 
+
+
+====Step 0==== 
+
+----Larger Loop No. 0---- 
+successful_actions: [] 
+Small Loop, action_queue: [] 
+[PyIR Prompt] 
+You will be given a natural language domain description and problem description.
+Your task is to generate a Python representation of Planning Domain Definition Language (PDDL) — one domain class and one problem class — using a simple, class-based intermediate representation (IR). 
+Python representation of PDDL domain file contains domain name, requirements, types of objects in the domain, predicates, and actions.
+Based on the natural language domain description, identify the actions that are possible.
+Identify action sematics i.e. understand the preconditions under which that action could be done and the effects of the action.
+Then identify appropriate predicates that could enable action semantics i.e. preconditions and effects.
+Python representation of PDDL domain file has a definitive syntax that must be followed for any domain. An abstract example is given below:
+
+In the following Python domain file, the example class DomainName has been created. Its structure is similar to how a PDDL domain should be defined.
+
+Name of the domain is the name of the Python class (DomainName).
+Types are defined as class variables at the top (Type1, Type2).
+Predicates are defined as instance methods decorated with @predicate.
+Actions are defined as instance methods decorated with @action
+
+The positional arguments of @predicate and @action decorators are the types of the respective arguments.
+Methods decorated with @predicate should have empty bodies.
+Methods decorated with @action return a tuple of two lists
+
+<domain_file>
+# imports stays exactly same for all domain files
+# this python code should be executed without any python syntax errors
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class DomainName(Domain):
+	# let's think step by step and correctly define all the aspects of a domain file
+	# making sure that the list of types, predicates, and actions comprehensively define the give domain
+    Type1 = create_type("Type1")
+    Type2 = create_type("Type2")
+
+	# making sure that all the predicates needed are defined below
+	# predicates have all the arguments needed along with the types
+    # let's not have two predicates with the same name
+    # let's make sure two arguments of a predicate function doesn't have same names. That would be a python syntax error.
+    @predicate(Type1, Type2)
+    def predicate1(self, arg1, arg2):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+    @predicate(Type1)
+    def predicate2(self, arg1):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+	# let's define a list of actions that comprehensively define the given domain
+	# the names for actions are always given precisely in the domain description, using only those actions
+	# making sure that each action is defined with :parameters where every arguments needed for preconditions and effects are specified
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure preconditions is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure effects is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1, Type2, Type2)
+    def action1(self, arg1, arg2, arg3):
+        precond = [self.predicate1(arg1, arg3), self.predicate2(arg1)]
+        effect = [~self.predicate1(arg1, arg2), self.predicate2(arg3)]
+        return precond, effect
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure :precondition is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure :effect is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1)
+    def action2(self, arg1):
+        precond = [self.predicate2(arg1)]
+        effect = [~self.predicate2(arg1)]
+        return precond, effect
+</domain_file>
+
+Notes for generating domain file: 
+- the above example file is only for understanding the syntax
+- type1 & type2 are only representative and should be replaced with appropriate types. There could be any number of types.
+- predicate1 & predicate2 are only representative and should be replaced with appropriate predicates. There could be any number of predicates.
+- action1 & action2 are only representative and should be replaced with appropriate actions. There could be any number of actions.
+- arg1 & arg2 are only representative and should be replaced with appropriate arguments for predicates and in preconditions and effects.
+- Use predicates with arguments of the right type as declared in domain file
+- All the arguments to any :precondition or :effect of an action should be declared in :parameters as input arguments
+- Verify and reason about correctness by reiterating the reasoning behind different predicates and actions
+
+
+
+
+Python representation of PDDL problem file contains problem name, domain name, objects in this problem instance, init state of objects, and goal state of objects.
+Based on the natural language problem description, identify the relevant objects for this problems with their names and types.
+Represent the initial state with the appropriate predicates and object arguments. Represent the goal state with the appropriate predicates and object arguments.
+Python representation of PDDL problem file has a definitive syntax that must be followed for any problem. An abstract example is given below.
+
+<problem_file>
+# imports stays the same for all problem files
+# Assume DomainName is declared just before the problem file
+# this python code should be executed correctly without any syntax errors
+from py2pddl import goal, init
+
+# let's define all the aspects of a problem file below starting with domain, objects, init state, and goal state
+
+class ProblemName(DomainName):
+	# making sure of defining all the objects that are required to define init state and goal state
+    # defining the objects with a list of strings will generate a dict and the object should be retrieve as a dict as in the example below in goal function
+    def __init__(self):
+        super().__init__()
+        self.type1Objs = DomainName.Type1.create_objs([1, 2], prefix="type1Obj")
+        self.type2Objs = DomainName.Type2.create_objs(["type2Obj1", "type2Obj2"])
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @init
+    def init(self):
+        at = [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj1"]),
+              self.predicate2(self.type1Objs[1]),]
+        return at
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @goal
+    def goal(self):
+        return [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj2"]),
+                self.predicate2(self.type1Objs[2])]
+</problem_file>
+
+Notes for generating problem file:
+- No need to import DomainName for python problem file. Python Domain file and python problem file would be merged and executed.
+- type1Objs, type2Oobjs, ... are only representative and should be replaced with appropriate objects. There could be any number of obects with their types.
+- init state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define init state
+- goal state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define goal state
+- Use predicates with arguments of the right type as declared in domain file
+- All the objects that would be arguments of predicates in init and goal states should be declared in __init__
+
+
+Here is the natural language description of the domain and problem:
+
+You are in an environment that you explore step by step. You must build and update the Python Representation of PDDL files of the environment based on only your observations.
+Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
+Do not assume that there will be a door connecting rooms.
+Your task is always to keep exploration and go to a location you have not visited yet.
+In other words, your goal should go to other not visited location.
+Here are your current observations: Action: look around
+You are in the kitchen. To the South you see a closed patio door. To the West you see a closed plain door. 
+
+Here are some valid actions you can take: ['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+Return output in strict JSON with two fields only, no extra text:
+{
+  "py_domain": "<python code for the domain class that represents the PDDL domain>",
+  "py_problem": "<python code for the problem class that represents the PDDL problem>"
+}
+
+Generated py_domain:
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+Generated py_problem:
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'south_room', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            self.at(self.roomObjs['kitchen']),
+            self.south_door(self.doorObjs['door_south']),
+            self.patio(self.doorObjs['door_south']),
+            self.west_door(self.doorObjs['door_west']),
+            self.plain(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        return [self.at(self.roomObjs['south_room'])]
+
+--Small Loop--: 0 
+[IR→PDDL Prompt] 
+You will be given a class-based Python IR for a PDDL domain (one domain class) and a PDDL problem instance (one problem class),
+plus the current observations and valid actions. Convert that IR into syntactically correct and mutually consistent PDDL.
+
+### Hard constraints (must follow exactly)
+- Declare EXACTLY these two actions with these names and parameter orders:
+  1) :action open-door
+     :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+  2) :action move
+     :parameters (?from - location ?to - location ?dir - direction)
+- Use typed PDDL (declare `location` and `direction` in :types).
+- In problem file's init, you shouldn't have "not ()" but only the single status.
+- The goal must be ground (e.g., (at loc_2)), never (at ?l) or quantifiers.
+- Keep edits minimal if previous PDDL is provided.
+
+### Current observations
+Action: look around
+You are in the kitchen. To the South you see a closed patio door. To the West you see a closed plain door. 
+
+
+### Valid actions
+['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+### (Optional) Previous PDDL (use as base with minimal fixes)
+N/A
+
+### (Optional) Planner/validator feedback to fix
+N/A
+
+### (Optional) Environment feedback to fix
+N/A
+
+### Python IR: domain class
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+
+### Python IR: problem class
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'south_room', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            self.at(self.roomObjs['kitchen']),
+            self.south_door(self.doorObjs['door_south']),
+            self.patio(self.doorObjs['door_south']),
+            self.west_door(self.doorObjs['door_west']),
+            self.plain(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        return [self.at(self.roomObjs['south_room'])]
+
+
+Return output in STRICT JSON with two keys only, no extra commentary:
+{
+  "df": "<PDDL domain file text>",
+  "pf": "<PDDL problem file text>"
+}
+ 
+[PDDL df]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+
+[PDDL pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen south_room west_room - location
+    south west - direction
+  )
+  (:init
+    (at kitchen)
+    (connected kitchen south_room south)
+    (connected kitchen west_room west)
+  )
+  (:goal (and (at south_room)))
+)
+
+Actions from solver(df, pf): ['open door to south', 'move south'] 
+Raw plan text: (OPEN-DOOR KITCHEN SOUTH_ROOM SOUTH)
+(MOVE KITCHEN SOUTH_ROOM SOUTH)
+ 
+Current action_queue: ['open door to south', 'move south'] 
+> open door to south 
+ You open the patio door, revealing the backyard.  
+Small Loop, action_queue: ['move south'] 
+Current action_queue: ['move south'] 
+> move south 
+ You are in the backyard. In one part of the room you see a barbeque. There is also a workbench, that has nothing on it. You also see a patio chair, that has nothing on it. In another part of the room you see a patio table, that has nothing on it. In one part of the room you see a clothes line, that has nothing on it. There is also a garden, that has nothing on it. 
+Through an open patio door, to the North you see the kitchen. To the South you see the driveway. To the East you see the street. To the West you see a closed patio door.  
+
+
+====Step 1==== 
+
+----Larger Loop No. 0---- 
+successful_actions: ['open door to south', 'move south'] 
+Small Loop, action_queue: [] 
+[PyIR Prompt] 
+You will be given a natural language domain description and problem description.
+Your task is to generate a Python representation of Planning Domain Definition Language (PDDL) — one domain class and one problem class — using a simple, class-based intermediate representation (IR). 
+Python representation of PDDL domain file contains domain name, requirements, types of objects in the domain, predicates, and actions.
+Based on the natural language domain description, identify the actions that are possible.
+Identify action sematics i.e. understand the preconditions under which that action could be done and the effects of the action.
+Then identify appropriate predicates that could enable action semantics i.e. preconditions and effects.
+Python representation of PDDL domain file has a definitive syntax that must be followed for any domain. An abstract example is given below:
+
+In the following Python domain file, the example class DomainName has been created. Its structure is similar to how a PDDL domain should be defined.
+
+Name of the domain is the name of the Python class (DomainName).
+Types are defined as class variables at the top (Type1, Type2).
+Predicates are defined as instance methods decorated with @predicate.
+Actions are defined as instance methods decorated with @action
+
+The positional arguments of @predicate and @action decorators are the types of the respective arguments.
+Methods decorated with @predicate should have empty bodies.
+Methods decorated with @action return a tuple of two lists
+
+<domain_file>
+# imports stays exactly same for all domain files
+# this python code should be executed without any python syntax errors
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class DomainName(Domain):
+	# let's think step by step and correctly define all the aspects of a domain file
+	# making sure that the list of types, predicates, and actions comprehensively define the give domain
+    Type1 = create_type("Type1")
+    Type2 = create_type("Type2")
+
+	# making sure that all the predicates needed are defined below
+	# predicates have all the arguments needed along with the types
+    # let's not have two predicates with the same name
+    # let's make sure two arguments of a predicate function doesn't have same names. That would be a python syntax error.
+    @predicate(Type1, Type2)
+    def predicate1(self, arg1, arg2):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+    @predicate(Type1)
+    def predicate2(self, arg1):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+	# let's define a list of actions that comprehensively define the given domain
+	# the names for actions are always given precisely in the domain description, using only those actions
+	# making sure that each action is defined with :parameters where every arguments needed for preconditions and effects are specified
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure preconditions is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure effects is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1, Type2, Type2)
+    def action1(self, arg1, arg2, arg3):
+        precond = [self.predicate1(arg1, arg3), self.predicate2(arg1)]
+        effect = [~self.predicate1(arg1, arg2), self.predicate2(arg3)]
+        return precond, effect
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure :precondition is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure :effect is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1)
+    def action2(self, arg1):
+        precond = [self.predicate2(arg1)]
+        effect = [~self.predicate2(arg1)]
+        return precond, effect
+</domain_file>
+
+Notes for generating domain file: 
+- the above example file is only for understanding the syntax
+- type1 & type2 are only representative and should be replaced with appropriate types. There could be any number of types.
+- predicate1 & predicate2 are only representative and should be replaced with appropriate predicates. There could be any number of predicates.
+- action1 & action2 are only representative and should be replaced with appropriate actions. There could be any number of actions.
+- arg1 & arg2 are only representative and should be replaced with appropriate arguments for predicates and in preconditions and effects.
+- Use predicates with arguments of the right type as declared in domain file
+- All the arguments to any :precondition or :effect of an action should be declared in :parameters as input arguments
+- Verify and reason about correctness by reiterating the reasoning behind different predicates and actions
+
+
+
+
+Python representation of PDDL problem file contains problem name, domain name, objects in this problem instance, init state of objects, and goal state of objects.
+Based on the natural language problem description, identify the relevant objects for this problems with their names and types.
+Represent the initial state with the appropriate predicates and object arguments. Represent the goal state with the appropriate predicates and object arguments.
+Python representation of PDDL problem file has a definitive syntax that must be followed for any problem. An abstract example is given below.
+
+<problem_file>
+# imports stays the same for all problem files
+# Assume DomainName is declared just before the problem file
+# this python code should be executed correctly without any syntax errors
+from py2pddl import goal, init
+
+# let's define all the aspects of a problem file below starting with domain, objects, init state, and goal state
+
+class ProblemName(DomainName):
+	# making sure of defining all the objects that are required to define init state and goal state
+    # defining the objects with a list of strings will generate a dict and the object should be retrieve as a dict as in the example below in goal function
+    def __init__(self):
+        super().__init__()
+        self.type1Objs = DomainName.Type1.create_objs([1, 2], prefix="type1Obj")
+        self.type2Objs = DomainName.Type2.create_objs(["type2Obj1", "type2Obj2"])
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @init
+    def init(self):
+        at = [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj1"]),
+              self.predicate2(self.type1Objs[1]),]
+        return at
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @goal
+    def goal(self):
+        return [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj2"]),
+                self.predicate2(self.type1Objs[2])]
+</problem_file>
+
+Notes for generating problem file:
+- No need to import DomainName for python problem file. Python Domain file and python problem file would be merged and executed.
+- type1Objs, type2Oobjs, ... are only representative and should be replaced with appropriate objects. There could be any number of obects with their types.
+- init state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define init state
+- goal state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define goal state
+- Use predicates with arguments of the right type as declared in domain file
+- All the objects that would be arguments of predicates in init and goal states should be declared in __init__
+
+
+Here is the natural language description of the domain and problem:
+
+You are in an environment that you explore step by step. You must build and update the Python Representation of PDDL files of the environment based on only your observations.
+Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
+Do not assume that there will be a door connecting rooms.
+Your task is always to keep exploration and go to a location you have not visited yet.
+In other words, your goal should go to other not visited location.
+Here are your current observations: Action: open door to south
+You open the patio door, revealing the backyard. 
+
+Action: move south
+You are in the backyard. Through an open patio door, to the North you see the kitchen. To the South you see the driveway. To the East you see the street. To the West you see a closed patio door. 
+
+Here are some valid actions you can take: ['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+Return output in strict JSON with two fields only, no extra text:
+{
+  "py_domain": "<python code for the domain class that represents the PDDL domain>",
+  "py_problem": "<python code for the problem class that represents the PDDL problem>"
+}
+
+        ### Previous IR and PDDL history:
+        ### Previous Python IR (edit minimally)
+[py_domain]
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+
+[py_problem]
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'south_room', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            self.at(self.roomObjs['kitchen']),
+            self.south_door(self.doorObjs['door_south']),
+            self.patio(self.doorObjs['door_south']),
+            self.west_door(self.doorObjs['door_west']),
+            self.plain(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        return [self.at(self.roomObjs['south_room'])]
+
+
+### Previous PDDL (edit minimally)
+[df]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+
+[pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen south_room west_room - location
+    south west - direction
+  )
+  (:init
+    (at kitchen)
+    (connected kitchen south_room south)
+    (connected kitchen west_room west)
+  )
+  (:goal (and (at south_room)))
+)
+
+### Environment feedback (if any)
+N/A
+
+        ### End of history.
+
+        Now, based on the above history and your current observation, update the Python representation of PDDL files. 
+        
+Generated py_domain:
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+Generated py_problem:
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        # Updated room objects: 'kitchen' is the previously visited room,
+        # 'backyard' is the current location, and 'driveway' and 'west_room' are unvisited.
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent is now in the backyard
+            self.at(self.roomObjs['backyard']),
+            # door_south is a south door and is open (it was opened to reveal the backyard & remains open to driveway)
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south']),
+            self.patio(self.doorObjs['door_south']),
+            # door_west is a west door and is a closed patio door
+            self.west_door(self.doorObjs['door_west']),
+            self.patio(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The goal is to explore a new unvisited location; here, the driveway (to the south of backyard)
+        return [self.at(self.roomObjs['driveway'])]
+--Small Loop--: 1 
+[IR→PDDL Prompt] 
+You will be given a class-based Python IR for a PDDL domain (one domain class) and a PDDL problem instance (one problem class),
+plus the current observations and valid actions. Convert that IR into syntactically correct and mutually consistent PDDL.
+
+### Hard constraints (must follow exactly)
+- Declare EXACTLY these two actions with these names and parameter orders:
+  1) :action open-door
+     :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+  2) :action move
+     :parameters (?from - location ?to - location ?dir - direction)
+- Use typed PDDL (declare `location` and `direction` in :types).
+- In problem file's init, you shouldn't have "not ()" but only the single status.
+- The goal must be ground (e.g., (at loc_2)), never (at ?l) or quantifiers.
+- Keep edits minimal if previous PDDL is provided.
+
+### Current observations
+Action: open door to south
+You open the patio door, revealing the backyard. 
+
+Action: move south
+You are in the backyard. Through an open patio door, to the North you see the kitchen. To the South you see the driveway. To the East you see the street. To the West you see a closed patio door. 
+
+
+### Valid actions
+['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+### (Optional) Previous PDDL (use as base with minimal fixes)
+[Domain file]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+
+[Problem file]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen south_room west_room - location
+    south west - direction
+  )
+  (:init
+    (at kitchen)
+    (connected kitchen south_room south)
+    (connected kitchen west_room west)
+  )
+  (:goal (and (at south_room)))
+)
+
+
+### (Optional) Planner/validator feedback to fix
+N/A
+
+### (Optional) Environment feedback to fix
+N/A
+
+### Python IR: domain class
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+### Python IR: problem class
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        # Updated room objects: 'kitchen' is the previously visited room,
+        # 'backyard' is the current location, and 'driveway' and 'west_room' are unvisited.
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent is now in the backyard
+            self.at(self.roomObjs['backyard']),
+            # door_south is a south door and is open (it was opened to reveal the backyard & remains open to driveway)
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south']),
+            self.patio(self.doorObjs['door_south']),
+            # door_west is a west door and is a closed patio door
+            self.west_door(self.doorObjs['door_west']),
+            self.patio(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The goal is to explore a new unvisited location; here, the driveway (to the south of backyard)
+        return [self.at(self.roomObjs['driveway'])]
+
+Return output in STRICT JSON with two keys only, no extra commentary:
+{
+  "df": "<PDDL domain file text>",
+  "pf": "<PDDL problem file text>"
+}
+ 
+[PDDL df]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[PDDL pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at backyard)
+    (door_open backyard south)
+    (connected backyard driveway south)
+    (connected backyard west_room west)
+  )
+  (:goal (and (at driveway)))
+)
+Actions from solver(df, pf): ['move south'] 
+Raw plan text: (MOVE BACKYARD DRIVEWAY SOUTH)
+ 
+Current action_queue: ['move south'] 
+> move south 
+ You are in the driveway. 
+To the North you see the backyard.  
+
+
+====Step 2==== 
+
+----Larger Loop No. 0---- 
+successful_actions: ['open door to south', 'move south', 'move south'] 
+Small Loop, action_queue: [] 
+[PyIR Prompt] 
+You will be given a natural language domain description and problem description.
+Your task is to generate a Python representation of Planning Domain Definition Language (PDDL) — one domain class and one problem class — using a simple, class-based intermediate representation (IR). 
+Python representation of PDDL domain file contains domain name, requirements, types of objects in the domain, predicates, and actions.
+Based on the natural language domain description, identify the actions that are possible.
+Identify action sematics i.e. understand the preconditions under which that action could be done and the effects of the action.
+Then identify appropriate predicates that could enable action semantics i.e. preconditions and effects.
+Python representation of PDDL domain file has a definitive syntax that must be followed for any domain. An abstract example is given below:
+
+In the following Python domain file, the example class DomainName has been created. Its structure is similar to how a PDDL domain should be defined.
+
+Name of the domain is the name of the Python class (DomainName).
+Types are defined as class variables at the top (Type1, Type2).
+Predicates are defined as instance methods decorated with @predicate.
+Actions are defined as instance methods decorated with @action
+
+The positional arguments of @predicate and @action decorators are the types of the respective arguments.
+Methods decorated with @predicate should have empty bodies.
+Methods decorated with @action return a tuple of two lists
+
+<domain_file>
+# imports stays exactly same for all domain files
+# this python code should be executed without any python syntax errors
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class DomainName(Domain):
+	# let's think step by step and correctly define all the aspects of a domain file
+	# making sure that the list of types, predicates, and actions comprehensively define the give domain
+    Type1 = create_type("Type1")
+    Type2 = create_type("Type2")
+
+	# making sure that all the predicates needed are defined below
+	# predicates have all the arguments needed along with the types
+    # let's not have two predicates with the same name
+    # let's make sure two arguments of a predicate function doesn't have same names. That would be a python syntax error.
+    @predicate(Type1, Type2)
+    def predicate1(self, arg1, arg2):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+    @predicate(Type1)
+    def predicate2(self, arg1):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+	# let's define a list of actions that comprehensively define the given domain
+	# the names for actions are always given precisely in the domain description, using only those actions
+	# making sure that each action is defined with :parameters where every arguments needed for preconditions and effects are specified
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure preconditions is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure effects is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1, Type2, Type2)
+    def action1(self, arg1, arg2, arg3):
+        precond = [self.predicate1(arg1, arg3), self.predicate2(arg1)]
+        effect = [~self.predicate1(arg1, arg2), self.predicate2(arg3)]
+        return precond, effect
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure :precondition is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure :effect is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1)
+    def action2(self, arg1):
+        precond = [self.predicate2(arg1)]
+        effect = [~self.predicate2(arg1)]
+        return precond, effect
+</domain_file>
+
+Notes for generating domain file: 
+- the above example file is only for understanding the syntax
+- type1 & type2 are only representative and should be replaced with appropriate types. There could be any number of types.
+- predicate1 & predicate2 are only representative and should be replaced with appropriate predicates. There could be any number of predicates.
+- action1 & action2 are only representative and should be replaced with appropriate actions. There could be any number of actions.
+- arg1 & arg2 are only representative and should be replaced with appropriate arguments for predicates and in preconditions and effects.
+- Use predicates with arguments of the right type as declared in domain file
+- All the arguments to any :precondition or :effect of an action should be declared in :parameters as input arguments
+- Verify and reason about correctness by reiterating the reasoning behind different predicates and actions
+
+
+
+
+Python representation of PDDL problem file contains problem name, domain name, objects in this problem instance, init state of objects, and goal state of objects.
+Based on the natural language problem description, identify the relevant objects for this problems with their names and types.
+Represent the initial state with the appropriate predicates and object arguments. Represent the goal state with the appropriate predicates and object arguments.
+Python representation of PDDL problem file has a definitive syntax that must be followed for any problem. An abstract example is given below.
+
+<problem_file>
+# imports stays the same for all problem files
+# Assume DomainName is declared just before the problem file
+# this python code should be executed correctly without any syntax errors
+from py2pddl import goal, init
+
+# let's define all the aspects of a problem file below starting with domain, objects, init state, and goal state
+
+class ProblemName(DomainName):
+	# making sure of defining all the objects that are required to define init state and goal state
+    # defining the objects with a list of strings will generate a dict and the object should be retrieve as a dict as in the example below in goal function
+    def __init__(self):
+        super().__init__()
+        self.type1Objs = DomainName.Type1.create_objs([1, 2], prefix="type1Obj")
+        self.type2Objs = DomainName.Type2.create_objs(["type2Obj1", "type2Obj2"])
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @init
+    def init(self):
+        at = [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj1"]),
+              self.predicate2(self.type1Objs[1]),]
+        return at
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @goal
+    def goal(self):
+        return [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj2"]),
+                self.predicate2(self.type1Objs[2])]
+</problem_file>
+
+Notes for generating problem file:
+- No need to import DomainName for python problem file. Python Domain file and python problem file would be merged and executed.
+- type1Objs, type2Oobjs, ... are only representative and should be replaced with appropriate objects. There could be any number of obects with their types.
+- init state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define init state
+- goal state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define goal state
+- Use predicates with arguments of the right type as declared in domain file
+- All the objects that would be arguments of predicates in init and goal states should be declared in __init__
+
+
+Here is the natural language description of the domain and problem:
+
+You are in an environment that you explore step by step. You must build and update the Python Representation of PDDL files of the environment based on only your observations.
+Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
+Do not assume that there will be a door connecting rooms.
+Your task is always to keep exploration and go to a location you have not visited yet.
+In other words, your goal should go to other not visited location.
+Here are your current observations: Action: move south
+You are in the driveway. To the North you see the backyard. 
+
+Here are some valid actions you can take: ['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+Return output in strict JSON with two fields only, no extra text:
+{
+  "py_domain": "<python code for the domain class that represents the PDDL domain>",
+  "py_problem": "<python code for the problem class that represents the PDDL problem>"
+}
+
+        ### Previous IR and PDDL history:
+        ### Previous Python IR (edit minimally)
+[py_domain]
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+[py_problem]
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        # Updated room objects: 'kitchen' is the previously visited room,
+        # 'backyard' is the current location, and 'driveway' and 'west_room' are unvisited.
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent is now in the backyard
+            self.at(self.roomObjs['backyard']),
+            # door_south is a south door and is open (it was opened to reveal the backyard & remains open to driveway)
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south']),
+            self.patio(self.doorObjs['door_south']),
+            # door_west is a west door and is a closed patio door
+            self.west_door(self.doorObjs['door_west']),
+            self.patio(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The goal is to explore a new unvisited location; here, the driveway (to the south of backyard)
+        return [self.at(self.roomObjs['driveway'])]
+
+### Previous PDDL (edit minimally)
+[df]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at backyard)
+    (door_open backyard south)
+    (connected backyard driveway south)
+    (connected backyard west_room west)
+  )
+  (:goal (and (at driveway)))
+)
+### Environment feedback (if any)
+N/A
+
+        ### End of history.
+
+        Now, based on the above history and your current observation, update the Python representation of PDDL files. 
+        
+Generated py_domain:
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    # New predicate added to capture the observed northward connection
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+Generated py_problem:
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        # Previously defined rooms: 'kitchen' (visited), 'backyard', 'driveway', and 'west_room' (unvisited)
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Current observation: after executing move south, the agent is now in the driveway
+            self.at(self.roomObjs['driveway']),
+            # From the driveway, the agent observes that to the North (i.e. opposite of the previous south door orientation) lies the backyard
+            self.north_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The exploration goal is to move to an unvisited location; here, 'west_room' remains unexplored
+        return [self.at(self.roomObjs['west_room'])]
+
+--Small Loop--: 1 
+[IR→PDDL Prompt] 
+You will be given a class-based Python IR for a PDDL domain (one domain class) and a PDDL problem instance (one problem class),
+plus the current observations and valid actions. Convert that IR into syntactically correct and mutually consistent PDDL.
+
+### Hard constraints (must follow exactly)
+- Declare EXACTLY these two actions with these names and parameter orders:
+  1) :action open-door
+     :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+  2) :action move
+     :parameters (?from - location ?to - location ?dir - direction)
+- Use typed PDDL (declare `location` and `direction` in :types).
+- In problem file's init, you shouldn't have "not ()" but only the single status.
+- The goal must be ground (e.g., (at loc_2)), never (at ?l) or quantifiers.
+- Keep edits minimal if previous PDDL is provided.
+
+### Current observations
+Action: move south
+You are in the driveway. To the North you see the backyard. 
+
+
+### Valid actions
+['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+### (Optional) Previous PDDL (use as base with minimal fixes)
+[Domain file]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[Problem file]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at backyard)
+    (door_open backyard south)
+    (connected backyard driveway south)
+    (connected backyard west_room west)
+  )
+  (:goal (and (at driveway)))
+)
+
+### (Optional) Planner/validator feedback to fix
+N/A
+
+### (Optional) Environment feedback to fix
+N/A
+
+### Python IR: domain class
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    # New predicate added to capture the observed northward connection
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+
+### Python IR: problem class
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        # Previously defined rooms: 'kitchen' (visited), 'backyard', 'driveway', and 'west_room' (unvisited)
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Current observation: after executing move south, the agent is now in the driveway
+            self.at(self.roomObjs['driveway']),
+            # From the driveway, the agent observes that to the North (i.e. opposite of the previous south door orientation) lies the backyard
+            self.north_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The exploration goal is to move to an unvisited location; here, 'west_room' remains unexplored
+        return [self.at(self.roomObjs['west_room'])]
+
+
+Return output in STRICT JSON with two keys only, no extra commentary:
+{
+  "df": "<PDDL domain file text>",
+  "pf": "<PDDL problem file text>"
+}
+ 
+[PDDL df]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 ?loc2 ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[PDDL pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (and (at west_room)))
+)
+Actions from solver(df, pf): None 
+Raw plan text:  
+--Small Loop--: 1 
+[IR→PDDL Prompt Retry] 
+You will be given a class-based Python IR for a PDDL domain (one domain class) and a PDDL problem instance (one problem class),
+plus the current observations and valid actions. Convert that IR into syntactically correct and mutually consistent PDDL.
+
+### Hard constraints (must follow exactly)
+- Declare EXACTLY these two actions with these names and parameter orders:
+  1) :action open-door
+     :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+  2) :action move
+     :parameters (?from - location ?to - location ?dir - direction)
+- Use typed PDDL (declare `location` and `direction` in :types).
+- In problem file's init, you shouldn't have "not ()" but only the single status.
+- The goal must be ground (e.g., (at loc_2)), never (at ?l) or quantifiers.
+- Keep edits minimal if previous PDDL is provided.
+
+### Current observations
+Action: move south
+You are in the driveway. To the North you see the backyard. 
+
+
+### Valid actions
+['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+### (Optional) Previous PDDL (use as base with minimal fixes)
+[Domain file]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 ?loc2 ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[Problem file]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (and (at west_room)))
+)
+
+### (Optional) Planner/validator feedback to fix
+── SOLVER LOG ─────────────────────────────────
+type mismatch: constant DRIVEWAY as arg 0 of CONNECTED. check input files
+── VAL LOG ────────────────────────────────────
+No validation log.
+
+
+### (Optional) Environment feedback to fix
+N/A
+
+### Python IR: domain class
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    # New predicate added to capture the observed northward connection
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+
+### Python IR: problem class
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        # Previously defined rooms: 'kitchen' (visited), 'backyard', 'driveway', and 'west_room' (unvisited)
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Current observation: after executing move south, the agent is now in the driveway
+            self.at(self.roomObjs['driveway']),
+            # From the driveway, the agent observes that to the North (i.e. opposite of the previous south door orientation) lies the backyard
+            self.north_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The exploration goal is to move to an unvisited location; here, 'west_room' remains unexplored
+        return [self.at(self.roomObjs['west_room'])]
+
+
+Return output in STRICT JSON with two keys only, no extra commentary:
+{
+  "df": "<PDDL domain file text>",
+  "pf": "<PDDL problem file text>"
+}
+ 
+[PDDL df]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[PDDL pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (and (at west_room)))
+)
+Actions from solver(df, pf): ['open door to west', 'move west'] 
+Raw plan text: (OPEN-DOOR DRIVEWAY WEST_ROOM WEST)
+(MOVE DRIVEWAY WEST_ROOM WEST)
+ 
+Current action_queue: ['open door to west', 'move west'] 
+> open door to west 
+ Unknown action: I'm not sure what you mean. 
+Large loop error message: This is the action you take: open door to west. When you try to open door, there is no door here or there is nothing in this direction. If there is no door, you can directly move to that direction.
+ 
+
+----Larger Loop No. 1---- 
+successful_actions: ['open door to south', 'move south', 'move south'] 
+Small Loop, action_queue: [] 
+[PyIR Prompt] 
+You will be given a natural language domain description and problem description.
+Your task is to generate a Python representation of Planning Domain Definition Language (PDDL) — one domain class and one problem class — using a simple, class-based intermediate representation (IR). 
+Python representation of PDDL domain file contains domain name, requirements, types of objects in the domain, predicates, and actions.
+Based on the natural language domain description, identify the actions that are possible.
+Identify action sematics i.e. understand the preconditions under which that action could be done and the effects of the action.
+Then identify appropriate predicates that could enable action semantics i.e. preconditions and effects.
+Python representation of PDDL domain file has a definitive syntax that must be followed for any domain. An abstract example is given below:
+
+In the following Python domain file, the example class DomainName has been created. Its structure is similar to how a PDDL domain should be defined.
+
+Name of the domain is the name of the Python class (DomainName).
+Types are defined as class variables at the top (Type1, Type2).
+Predicates are defined as instance methods decorated with @predicate.
+Actions are defined as instance methods decorated with @action
+
+The positional arguments of @predicate and @action decorators are the types of the respective arguments.
+Methods decorated with @predicate should have empty bodies.
+Methods decorated with @action return a tuple of two lists
+
+<domain_file>
+# imports stays exactly same for all domain files
+# this python code should be executed without any python syntax errors
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class DomainName(Domain):
+	# let's think step by step and correctly define all the aspects of a domain file
+	# making sure that the list of types, predicates, and actions comprehensively define the give domain
+    Type1 = create_type("Type1")
+    Type2 = create_type("Type2")
+
+	# making sure that all the predicates needed are defined below
+	# predicates have all the arguments needed along with the types
+    # let's not have two predicates with the same name
+    # let's make sure two arguments of a predicate function doesn't have same names. That would be a python syntax error.
+    @predicate(Type1, Type2)
+    def predicate1(self, arg1, arg2):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+    @predicate(Type1)
+    def predicate2(self, arg1):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+	# let's define a list of actions that comprehensively define the given domain
+	# the names for actions are always given precisely in the domain description, using only those actions
+	# making sure that each action is defined with :parameters where every arguments needed for preconditions and effects are specified
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure preconditions is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure effects is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1, Type2, Type2)
+    def action1(self, arg1, arg2, arg3):
+        precond = [self.predicate1(arg1, arg3), self.predicate2(arg1)]
+        effect = [~self.predicate1(arg1, arg2), self.predicate2(arg3)]
+        return precond, effect
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure :precondition is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure :effect is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1)
+    def action2(self, arg1):
+        precond = [self.predicate2(arg1)]
+        effect = [~self.predicate2(arg1)]
+        return precond, effect
+</domain_file>
+
+Notes for generating domain file: 
+- the above example file is only for understanding the syntax
+- type1 & type2 are only representative and should be replaced with appropriate types. There could be any number of types.
+- predicate1 & predicate2 are only representative and should be replaced with appropriate predicates. There could be any number of predicates.
+- action1 & action2 are only representative and should be replaced with appropriate actions. There could be any number of actions.
+- arg1 & arg2 are only representative and should be replaced with appropriate arguments for predicates and in preconditions and effects.
+- Use predicates with arguments of the right type as declared in domain file
+- All the arguments to any :precondition or :effect of an action should be declared in :parameters as input arguments
+- Verify and reason about correctness by reiterating the reasoning behind different predicates and actions
+
+
+
+
+Python representation of PDDL problem file contains problem name, domain name, objects in this problem instance, init state of objects, and goal state of objects.
+Based on the natural language problem description, identify the relevant objects for this problems with their names and types.
+Represent the initial state with the appropriate predicates and object arguments. Represent the goal state with the appropriate predicates and object arguments.
+Python representation of PDDL problem file has a definitive syntax that must be followed for any problem. An abstract example is given below.
+
+<problem_file>
+# imports stays the same for all problem files
+# Assume DomainName is declared just before the problem file
+# this python code should be executed correctly without any syntax errors
+from py2pddl import goal, init
+
+# let's define all the aspects of a problem file below starting with domain, objects, init state, and goal state
+
+class ProblemName(DomainName):
+	# making sure of defining all the objects that are required to define init state and goal state
+    # defining the objects with a list of strings will generate a dict and the object should be retrieve as a dict as in the example below in goal function
+    def __init__(self):
+        super().__init__()
+        self.type1Objs = DomainName.Type1.create_objs([1, 2], prefix="type1Obj")
+        self.type2Objs = DomainName.Type2.create_objs(["type2Obj1", "type2Obj2"])
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @init
+    def init(self):
+        at = [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj1"]),
+              self.predicate2(self.type1Objs[1]),]
+        return at
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @goal
+    def goal(self):
+        return [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj2"]),
+                self.predicate2(self.type1Objs[2])]
+</problem_file>
+
+Notes for generating problem file:
+- No need to import DomainName for python problem file. Python Domain file and python problem file would be merged and executed.
+- type1Objs, type2Oobjs, ... are only representative and should be replaced with appropriate objects. There could be any number of obects with their types.
+- init state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define init state
+- goal state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define goal state
+- Use predicates with arguments of the right type as declared in domain file
+- All the objects that would be arguments of predicates in init and goal states should be declared in __init__
+
+
+Here is the natural language description of the domain and problem:
+
+You are in an environment that you explore step by step. You must build and update the Python Representation of PDDL files of the environment based on only your observations.
+Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
+Do not assume that there will be a door connecting rooms.
+Your task is always to keep exploration and go to a location you have not visited yet.
+In other words, your goal should go to other not visited location.
+Here are your current observations: Action: open door to west
+Unknown action: I'm not sure what you mean.
+
+Here are some valid actions you can take: ['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+Return output in strict JSON with two fields only, no extra text:
+{
+  "py_domain": "<python code for the domain class that represents the PDDL domain>",
+  "py_problem": "<python code for the problem class that represents the PDDL problem>"
+}
+
+        ### Previous IR and PDDL history:
+        ### Previous Python IR (edit minimally)
+[py_domain]
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    # New predicate added to capture the observed northward connection
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+
+[py_problem]
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        # Previously defined rooms: 'kitchen' (visited), 'backyard', 'driveway', and 'west_room' (unvisited)
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Current observation: after executing move south, the agent is now in the driveway
+            self.at(self.roomObjs['driveway']),
+            # From the driveway, the agent observes that to the North (i.e. opposite of the previous south door orientation) lies the backyard
+            self.north_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The exploration goal is to move to an unvisited location; here, 'west_room' remains unexplored
+        return [self.at(self.roomObjs['west_room'])]
+
+
+### Previous PDDL (edit minimally)
+[df]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (and (at west_room)))
+)
+### Environment feedback (if any)
+This is the action you take: open door to west. When you try to open door, there is no door here or there is nothing in this direction. If there is no door, you can directly move to that direction.
+
+
+        ### End of history.
+
+        Now, based on the above history and your current observation, update the Python representation of PDDL files. 
+        
+Generated py_domain:
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    # Updated move_west to allow direct movement when no door exists in the west direction
+    @action(Room, Room)
+    def move_west(self, current, new_room):
+        precond = [self.at(current)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+Generated py_problem:
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent is currently in the driveway
+            self.at(self.roomObjs['driveway']),
+            # The south door is observed and is open (allowing move south if needed)
+            self.north_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south'])
+            # Note: No west door is asserted, reflecting the observation that 'open door to west' failed
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The exploration goal remains to move to the unvisited west_room
+        return [self.at(self.roomObjs['west_room'])]
+
+--Small Loop--: 2 
+[IR→PDDL Prompt] 
+You will be given a class-based Python IR for a PDDL domain (one domain class) and a PDDL problem instance (one problem class),
+plus the current observations and valid actions. Convert that IR into syntactically correct and mutually consistent PDDL.
+
+### Hard constraints (must follow exactly)
+- Declare EXACTLY these two actions with these names and parameter orders:
+  1) :action open-door
+     :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+  2) :action move
+     :parameters (?from - location ?to - location ?dir - direction)
+- Use typed PDDL (declare `location` and `direction` in :types).
+- In problem file's init, you shouldn't have "not ()" but only the single status.
+- The goal must be ground (e.g., (at loc_2)), never (at ?l) or quantifiers.
+- Keep edits minimal if previous PDDL is provided.
+
+### Current observations
+Action: open door to west
+Unknown action: I'm not sure what you mean.
+
+
+### Valid actions
+['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+### (Optional) Previous PDDL (use as base with minimal fixes)
+[Domain file]
+(define (domain kitchen)
+  (:requirements :typing :strips)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (door_open ?from ?dir) (connected ?from ?to ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[Problem file]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (and (at west_room)))
+)
+
+### (Optional) Planner/validator feedback to fix
+N/A
+
+### (Optional) Environment feedback to fix
+This is the action you take: open door to west. When you try to open door, there is no door here or there is nothing in this direction. If there is no door, you can directly move to that direction.
+
+
+### Python IR: domain class
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    # Updated move_west to allow direct movement when no door exists in the west direction
+    @action(Room, Room)
+    def move_west(self, current, new_room):
+        precond = [self.at(current)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+
+### Python IR: problem class
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent is currently in the driveway
+            self.at(self.roomObjs['driveway']),
+            # The south door is observed and is open (allowing move south if needed)
+            self.north_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south'])
+            # Note: No west door is asserted, reflecting the observation that 'open door to west' failed
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The exploration goal remains to move to the unvisited west_room
+        return [self.at(self.roomObjs['west_room'])]
+
+
+Return output in STRICT JSON with two keys only, no extra commentary:
+{
+  "df": "<PDDL domain file text>",
+  "pf": "<PDDL problem file text>"
+}
+ 
+[PDDL df]
+(define (domain kitchen)
+  (:requirements :typing :strips :disjunctive-preconditions)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+    (door_exists ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (door_exists ?loc1 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (connected ?from ?to ?dir) (or (not (door_exists ?from ?dir)) (door_open ?from ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[PDDL pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_exists driveway south)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (at west_room))
+)
+Actions from solver(df, pf): ['move west'] 
+Raw plan text: (MOVE DRIVEWAY WEST_ROOM WEST)
+ 
+Current action_queue: ['move west'] 
+> move west 
+ Unknown action: I'm not sure what you mean. 
+Large loop error message: This is the action you take: move west. You cannot move to that direction. Review the predicate of your actions and the problem files to check the status. 
+
+----Larger Loop No. 2---- 
+successful_actions: ['open door to south', 'move south', 'move south'] 
+Small Loop, action_queue: [] 
+[PyIR Prompt] 
+You will be given a natural language domain description and problem description.
+Your task is to generate a Python representation of Planning Domain Definition Language (PDDL) — one domain class and one problem class — using a simple, class-based intermediate representation (IR). 
+Python representation of PDDL domain file contains domain name, requirements, types of objects in the domain, predicates, and actions.
+Based on the natural language domain description, identify the actions that are possible.
+Identify action sematics i.e. understand the preconditions under which that action could be done and the effects of the action.
+Then identify appropriate predicates that could enable action semantics i.e. preconditions and effects.
+Python representation of PDDL domain file has a definitive syntax that must be followed for any domain. An abstract example is given below:
+
+In the following Python domain file, the example class DomainName has been created. Its structure is similar to how a PDDL domain should be defined.
+
+Name of the domain is the name of the Python class (DomainName).
+Types are defined as class variables at the top (Type1, Type2).
+Predicates are defined as instance methods decorated with @predicate.
+Actions are defined as instance methods decorated with @action
+
+The positional arguments of @predicate and @action decorators are the types of the respective arguments.
+Methods decorated with @predicate should have empty bodies.
+Methods decorated with @action return a tuple of two lists
+
+<domain_file>
+# imports stays exactly same for all domain files
+# this python code should be executed without any python syntax errors
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class DomainName(Domain):
+	# let's think step by step and correctly define all the aspects of a domain file
+	# making sure that the list of types, predicates, and actions comprehensively define the give domain
+    Type1 = create_type("Type1")
+    Type2 = create_type("Type2")
+
+	# making sure that all the predicates needed are defined below
+	# predicates have all the arguments needed along with the types
+    # let's not have two predicates with the same name
+    # let's make sure two arguments of a predicate function doesn't have same names. That would be a python syntax error.
+    @predicate(Type1, Type2)
+    def predicate1(self, arg1, arg2):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+    @predicate(Type1)
+    def predicate2(self, arg1):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+	# let's define a list of actions that comprehensively define the given domain
+	# the names for actions are always given precisely in the domain description, using only those actions
+	# making sure that each action is defined with :parameters where every arguments needed for preconditions and effects are specified
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure preconditions is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure effects is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1, Type2, Type2)
+    def action1(self, arg1, arg2, arg3):
+        precond = [self.predicate1(arg1, arg3), self.predicate2(arg1)]
+        effect = [~self.predicate1(arg1, arg2), self.predicate2(arg3)]
+        return precond, effect
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure :precondition is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure :effect is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1)
+    def action2(self, arg1):
+        precond = [self.predicate2(arg1)]
+        effect = [~self.predicate2(arg1)]
+        return precond, effect
+</domain_file>
+
+Notes for generating domain file: 
+- the above example file is only for understanding the syntax
+- type1 & type2 are only representative and should be replaced with appropriate types. There could be any number of types.
+- predicate1 & predicate2 are only representative and should be replaced with appropriate predicates. There could be any number of predicates.
+- action1 & action2 are only representative and should be replaced with appropriate actions. There could be any number of actions.
+- arg1 & arg2 are only representative and should be replaced with appropriate arguments for predicates and in preconditions and effects.
+- Use predicates with arguments of the right type as declared in domain file
+- All the arguments to any :precondition or :effect of an action should be declared in :parameters as input arguments
+- Verify and reason about correctness by reiterating the reasoning behind different predicates and actions
+
+
+
+
+Python representation of PDDL problem file contains problem name, domain name, objects in this problem instance, init state of objects, and goal state of objects.
+Based on the natural language problem description, identify the relevant objects for this problems with their names and types.
+Represent the initial state with the appropriate predicates and object arguments. Represent the goal state with the appropriate predicates and object arguments.
+Python representation of PDDL problem file has a definitive syntax that must be followed for any problem. An abstract example is given below.
+
+<problem_file>
+# imports stays the same for all problem files
+# Assume DomainName is declared just before the problem file
+# this python code should be executed correctly without any syntax errors
+from py2pddl import goal, init
+
+# let's define all the aspects of a problem file below starting with domain, objects, init state, and goal state
+
+class ProblemName(DomainName):
+	# making sure of defining all the objects that are required to define init state and goal state
+    # defining the objects with a list of strings will generate a dict and the object should be retrieve as a dict as in the example below in goal function
+    def __init__(self):
+        super().__init__()
+        self.type1Objs = DomainName.Type1.create_objs([1, 2], prefix="type1Obj")
+        self.type2Objs = DomainName.Type2.create_objs(["type2Obj1", "type2Obj2"])
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @init
+    def init(self):
+        at = [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj1"]),
+              self.predicate2(self.type1Objs[1]),]
+        return at
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @goal
+    def goal(self):
+        return [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj2"]),
+                self.predicate2(self.type1Objs[2])]
+</problem_file>
+
+Notes for generating problem file:
+- No need to import DomainName for python problem file. Python Domain file and python problem file would be merged and executed.
+- type1Objs, type2Oobjs, ... are only representative and should be replaced with appropriate objects. There could be any number of obects with their types.
+- init state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define init state
+- goal state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define goal state
+- Use predicates with arguments of the right type as declared in domain file
+- All the objects that would be arguments of predicates in init and goal states should be declared in __init__
+
+
+Here is the natural language description of the domain and problem:
+
+You are in an environment that you explore step by step. You must build and update the Python Representation of PDDL files of the environment based on only your observations.
+Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
+Do not assume that there will be a door connecting rooms.
+Your task is always to keep exploration and go to a location you have not visited yet.
+In other words, your goal should go to other not visited location.
+Here are your current observations: Action: move west
+Unknown action: I'm not sure what you mean.
+
+Here are some valid actions you can take: ['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+Return output in strict JSON with two fields only, no extra text:
+{
+  "py_domain": "<python code for the domain class that represents the PDDL domain>",
+  "py_problem": "<python code for the problem class that represents the PDDL problem>"
+}
+
+        ### Previous IR and PDDL history:
+        ### Previous Python IR (edit minimally)
+[py_domain]
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    # Updated move_west to allow direct movement when no door exists in the west direction
+    @action(Room, Room)
+    def move_west(self, current, new_room):
+        precond = [self.at(current)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+
+[py_problem]
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent is currently in the driveway
+            self.at(self.roomObjs['driveway']),
+            # The south door is observed and is open (allowing move south if needed)
+            self.north_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south'])
+            # Note: No west door is asserted, reflecting the observation that 'open door to west' failed
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The exploration goal remains to move to the unvisited west_room
+        return [self.at(self.roomObjs['west_room'])]
+
+
+### Previous PDDL (edit minimally)
+[df]
+(define (domain kitchen)
+  (:requirements :typing :strips :disjunctive-preconditions)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+    (door_exists ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (door_exists ?loc1 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (connected ?from ?to ?dir) (or (not (door_exists ?from ?dir)) (door_open ?from ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_exists driveway south)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (at west_room))
+)
+### Environment feedback (if any)
+This is the action you take: move west. You cannot move to that direction. Review the predicate of your actions and the problem files to check the status.
+
+        ### End of history.
+
+        Now, based on the above history and your current observation, update the Python representation of PDDL files. 
+        
+Generated py_domain:
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+Generated py_problem:
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent starts in the driveway
+            self.at(self.roomObjs['driveway']),
+            # The south door is observed and open
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south']),
+            # The west door is present but remains closed, preventing move_west
+            self.west_door(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The goal remains to reach the unvisited west_room
+        return [self.at(self.roomObjs['west_room'])]
+--Small Loop--: 3 
+[IR→PDDL Prompt] 
+You will be given a class-based Python IR for a PDDL domain (one domain class) and a PDDL problem instance (one problem class),
+plus the current observations and valid actions. Convert that IR into syntactically correct and mutually consistent PDDL.
+
+### Hard constraints (must follow exactly)
+- Declare EXACTLY these two actions with these names and parameter orders:
+  1) :action open-door
+     :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+  2) :action move
+     :parameters (?from - location ?to - location ?dir - direction)
+- Use typed PDDL (declare `location` and `direction` in :types).
+- In problem file's init, you shouldn't have "not ()" but only the single status.
+- The goal must be ground (e.g., (at loc_2)), never (at ?l) or quantifiers.
+- Keep edits minimal if previous PDDL is provided.
+
+### Current observations
+Action: move west
+Unknown action: I'm not sure what you mean.
+
+
+### Valid actions
+['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+### (Optional) Previous PDDL (use as base with minimal fixes)
+[Domain file]
+(define (domain kitchen)
+  (:requirements :typing :strips :disjunctive-preconditions)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+    (door_exists ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (door_exists ?loc1 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (connected ?from ?to ?dir) (or (not (door_exists ?from ?dir)) (door_open ?from ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[Problem file]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_exists driveway south)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (at west_room))
+)
+
+### (Optional) Planner/validator feedback to fix
+N/A
+
+### (Optional) Environment feedback to fix
+This is the action you take: move west. You cannot move to that direction. Review the predicate of your actions and the problem files to check the status.
+
+### Python IR: domain class
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+### Python IR: problem class
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent starts in the driveway
+            self.at(self.roomObjs['driveway']),
+            # The south door is observed and open
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south']),
+            # The west door is present but remains closed, preventing move_west
+            self.west_door(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The goal remains to reach the unvisited west_room
+        return [self.at(self.roomObjs['west_room'])]
+
+Return output in STRICT JSON with two keys only, no extra commentary:
+{
+  "df": "<PDDL domain file text>",
+  "pf": "<PDDL problem file text>"
+}
+ 
+[PDDL df]
+(define (domain kitchen)
+  (:requirements :typing :strips :disjunctive-preconditions)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_exists ?loc - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (door_exists ?loc1 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (connected ?from ?to ?dir) (or (not (door_exists ?from ?dir)) (door_open ?from ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[PDDL pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_exists driveway south)
+    (door_open driveway south)
+    (door_exists driveway west)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (at west_room))
+)
+Actions from solver(df, pf): ['open door to west', 'move west'] 
+Raw plan text: (OPEN-DOOR DRIVEWAY WEST_ROOM WEST)
+(MOVE DRIVEWAY WEST_ROOM WEST)
+ 
+Current action_queue: ['open door to west', 'move west'] 
+> open door to west 
+ Unknown action: I'm not sure what you mean. 
+Large loop error message: This is the action you take: open door to west. When you try to open door, there is no door here or there is nothing in this direction. If there is no door, you can directly move to that direction.
+ 
+
+----Larger Loop No. 3---- 
+successful_actions: ['open door to south', 'move south', 'move south'] 
+Small Loop, action_queue: [] 
+[PyIR Prompt] 
+You will be given a natural language domain description and problem description.
+Your task is to generate a Python representation of Planning Domain Definition Language (PDDL) — one domain class and one problem class — using a simple, class-based intermediate representation (IR). 
+Python representation of PDDL domain file contains domain name, requirements, types of objects in the domain, predicates, and actions.
+Based on the natural language domain description, identify the actions that are possible.
+Identify action sematics i.e. understand the preconditions under which that action could be done and the effects of the action.
+Then identify appropriate predicates that could enable action semantics i.e. preconditions and effects.
+Python representation of PDDL domain file has a definitive syntax that must be followed for any domain. An abstract example is given below:
+
+In the following Python domain file, the example class DomainName has been created. Its structure is similar to how a PDDL domain should be defined.
+
+Name of the domain is the name of the Python class (DomainName).
+Types are defined as class variables at the top (Type1, Type2).
+Predicates are defined as instance methods decorated with @predicate.
+Actions are defined as instance methods decorated with @action
+
+The positional arguments of @predicate and @action decorators are the types of the respective arguments.
+Methods decorated with @predicate should have empty bodies.
+Methods decorated with @action return a tuple of two lists
+
+<domain_file>
+# imports stays exactly same for all domain files
+# this python code should be executed without any python syntax errors
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class DomainName(Domain):
+	# let's think step by step and correctly define all the aspects of a domain file
+	# making sure that the list of types, predicates, and actions comprehensively define the give domain
+    Type1 = create_type("Type1")
+    Type2 = create_type("Type2")
+
+	# making sure that all the predicates needed are defined below
+	# predicates have all the arguments needed along with the types
+    # let's not have two predicates with the same name
+    # let's make sure two arguments of a predicate function doesn't have same names. That would be a python syntax error.
+    @predicate(Type1, Type2)
+    def predicate1(self, arg1, arg2):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+    @predicate(Type1)
+    def predicate2(self, arg1):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+	# let's define a list of actions that comprehensively define the given domain
+	# the names for actions are always given precisely in the domain description, using only those actions
+	# making sure that each action is defined with :parameters where every arguments needed for preconditions and effects are specified
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure preconditions is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure effects is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1, Type2, Type2)
+    def action1(self, arg1, arg2, arg3):
+        precond = [self.predicate1(arg1, arg3), self.predicate2(arg1)]
+        effect = [~self.predicate1(arg1, arg2), self.predicate2(arg3)]
+        return precond, effect
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure :precondition is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure :effect is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1)
+    def action2(self, arg1):
+        precond = [self.predicate2(arg1)]
+        effect = [~self.predicate2(arg1)]
+        return precond, effect
+</domain_file>
+
+Notes for generating domain file: 
+- the above example file is only for understanding the syntax
+- type1 & type2 are only representative and should be replaced with appropriate types. There could be any number of types.
+- predicate1 & predicate2 are only representative and should be replaced with appropriate predicates. There could be any number of predicates.
+- action1 & action2 are only representative and should be replaced with appropriate actions. There could be any number of actions.
+- arg1 & arg2 are only representative and should be replaced with appropriate arguments for predicates and in preconditions and effects.
+- Use predicates with arguments of the right type as declared in domain file
+- All the arguments to any :precondition or :effect of an action should be declared in :parameters as input arguments
+- Verify and reason about correctness by reiterating the reasoning behind different predicates and actions
+
+
+
+
+Python representation of PDDL problem file contains problem name, domain name, objects in this problem instance, init state of objects, and goal state of objects.
+Based on the natural language problem description, identify the relevant objects for this problems with their names and types.
+Represent the initial state with the appropriate predicates and object arguments. Represent the goal state with the appropriate predicates and object arguments.
+Python representation of PDDL problem file has a definitive syntax that must be followed for any problem. An abstract example is given below.
+
+<problem_file>
+# imports stays the same for all problem files
+# Assume DomainName is declared just before the problem file
+# this python code should be executed correctly without any syntax errors
+from py2pddl import goal, init
+
+# let's define all the aspects of a problem file below starting with domain, objects, init state, and goal state
+
+class ProblemName(DomainName):
+	# making sure of defining all the objects that are required to define init state and goal state
+    # defining the objects with a list of strings will generate a dict and the object should be retrieve as a dict as in the example below in goal function
+    def __init__(self):
+        super().__init__()
+        self.type1Objs = DomainName.Type1.create_objs([1, 2], prefix="type1Obj")
+        self.type2Objs = DomainName.Type2.create_objs(["type2Obj1", "type2Obj2"])
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @init
+    def init(self):
+        at = [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj1"]),
+              self.predicate2(self.type1Objs[1]),]
+        return at
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @goal
+    def goal(self):
+        return [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj2"]),
+                self.predicate2(self.type1Objs[2])]
+</problem_file>
+
+Notes for generating problem file:
+- No need to import DomainName for python problem file. Python Domain file and python problem file would be merged and executed.
+- type1Objs, type2Oobjs, ... are only representative and should be replaced with appropriate objects. There could be any number of obects with their types.
+- init state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define init state
+- goal state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define goal state
+- Use predicates with arguments of the right type as declared in domain file
+- All the objects that would be arguments of predicates in init and goal states should be declared in __init__
+
+
+Here is the natural language description of the domain and problem:
+
+You are in an environment that you explore step by step. You must build and update the Python Representation of PDDL files of the environment based on only your observations.
+Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
+Do not assume that there will be a door connecting rooms.
+Your task is always to keep exploration and go to a location you have not visited yet.
+In other words, your goal should go to other not visited location.
+Here are your current observations: Action: open door to west
+Unknown action: I'm not sure what you mean.
+
+Here are some valid actions you can take: ['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+Return output in strict JSON with two fields only, no extra text:
+{
+  "py_domain": "<python code for the domain class that represents the PDDL domain>",
+  "py_problem": "<python code for the problem class that represents the PDDL problem>"
+}
+
+        ### Previous IR and PDDL history:
+        ### Previous Python IR (edit minimally)
+[py_domain]
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+[py_problem]
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent starts in the driveway
+            self.at(self.roomObjs['driveway']),
+            # The south door is observed and open
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south']),
+            # The west door is present but remains closed, preventing move_west
+            self.west_door(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The goal remains to reach the unvisited west_room
+        return [self.at(self.roomObjs['west_room'])]
+
+### Previous PDDL (edit minimally)
+[df]
+(define (domain kitchen)
+  (:requirements :typing :strips :disjunctive-preconditions)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_exists ?loc - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (door_exists ?loc1 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (connected ?from ?to ?dir) (or (not (door_exists ?from ?dir)) (door_open ?from ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_exists driveway south)
+    (door_open driveway south)
+    (door_exists driveway west)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (at west_room))
+)
+### Environment feedback (if any)
+This is the action you take: open door to west. When you try to open door, there is no door here or there is nothing in this direction. If there is no door, you can directly move to that direction.
+
+
+        ### End of history.
+
+        Now, based on the above history and your current observation, update the Python representation of PDDL files. 
+        
+Generated py_domain:
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    # Updated move_west: if there is no door, the agent can move directly west
+    @action(Room, Room)
+    def move_west(self, current, new_room):
+        precond = [self.at(current)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+Generated py_problem:
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        # Only the south door is observed in the current environment
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent starts in the driveway
+            self.at(self.roomObjs['driveway']),
+            # The south door is present and open
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The goal is to reach the unvisited west_room; note that no door exists to the west
+        return [self.at(self.roomObjs['west_room'])]
+--Small Loop--: 4 
+[IR→PDDL Prompt] 
+You will be given a class-based Python IR for a PDDL domain (one domain class) and a PDDL problem instance (one problem class),
+plus the current observations and valid actions. Convert that IR into syntactically correct and mutually consistent PDDL.
+
+### Hard constraints (must follow exactly)
+- Declare EXACTLY these two actions with these names and parameter orders:
+  1) :action open-door
+     :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+  2) :action move
+     :parameters (?from - location ?to - location ?dir - direction)
+- Use typed PDDL (declare `location` and `direction` in :types).
+- In problem file's init, you shouldn't have "not ()" but only the single status.
+- The goal must be ground (e.g., (at loc_2)), never (at ?l) or quantifiers.
+- Keep edits minimal if previous PDDL is provided.
+
+### Current observations
+Action: open door to west
+Unknown action: I'm not sure what you mean.
+
+
+### Valid actions
+['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+### (Optional) Previous PDDL (use as base with minimal fixes)
+[Domain file]
+(define (domain kitchen)
+  (:requirements :typing :strips :disjunctive-preconditions)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_exists ?loc - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (door_exists ?loc1 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (connected ?from ?to ?dir) (or (not (door_exists ?from ?dir)) (door_open ?from ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[Problem file]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_exists driveway south)
+    (door_open driveway south)
+    (door_exists driveway west)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (at west_room))
+)
+
+### (Optional) Planner/validator feedback to fix
+N/A
+
+### (Optional) Environment feedback to fix
+This is the action you take: open door to west. When you try to open door, there is no door here or there is nothing in this direction. If there is no door, you can directly move to that direction.
+
+
+### Python IR: domain class
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    # Updated move_west: if there is no door, the agent can move directly west
+    @action(Room, Room)
+    def move_west(self, current, new_room):
+        precond = [self.at(current)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+### Python IR: problem class
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        # Only the south door is observed in the current environment
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent starts in the driveway
+            self.at(self.roomObjs['driveway']),
+            # The south door is present and open
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The goal is to reach the unvisited west_room; note that no door exists to the west
+        return [self.at(self.roomObjs['west_room'])]
+
+Return output in STRICT JSON with two keys only, no extra commentary:
+{
+  "df": "<PDDL domain file text>",
+  "pf": "<PDDL problem file text>"
+}
+ 
+[PDDL df]
+(define (domain kitchen)
+  (:requirements :typing :strips :disjunctive-preconditions)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_exists ?loc - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (door_exists ?loc1 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (connected ?from ?to ?dir) (or (not (door_exists ?from ?dir)) (door_open ?from ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[PDDL pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_exists driveway south)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (at west_room))
+)
+Actions from solver(df, pf): ['move west'] 
+Raw plan text: (MOVE DRIVEWAY WEST_ROOM WEST)
+ 
+Current action_queue: ['move west'] 
+> move west 
+ Unknown action: I'm not sure what you mean. 
+Large loop error message: This is the action you take: move west. You cannot move to that direction. Review the predicate of your actions and the problem files to check the status. 
+
+----Larger Loop No. 4---- 
+successful_actions: ['open door to south', 'move south', 'move south'] 
+Small Loop, action_queue: [] 
+[PyIR Prompt] 
+You will be given a natural language domain description and problem description.
+Your task is to generate a Python representation of Planning Domain Definition Language (PDDL) — one domain class and one problem class — using a simple, class-based intermediate representation (IR). 
+Python representation of PDDL domain file contains domain name, requirements, types of objects in the domain, predicates, and actions.
+Based on the natural language domain description, identify the actions that are possible.
+Identify action sematics i.e. understand the preconditions under which that action could be done and the effects of the action.
+Then identify appropriate predicates that could enable action semantics i.e. preconditions and effects.
+Python representation of PDDL domain file has a definitive syntax that must be followed for any domain. An abstract example is given below:
+
+In the following Python domain file, the example class DomainName has been created. Its structure is similar to how a PDDL domain should be defined.
+
+Name of the domain is the name of the Python class (DomainName).
+Types are defined as class variables at the top (Type1, Type2).
+Predicates are defined as instance methods decorated with @predicate.
+Actions are defined as instance methods decorated with @action
+
+The positional arguments of @predicate and @action decorators are the types of the respective arguments.
+Methods decorated with @predicate should have empty bodies.
+Methods decorated with @action return a tuple of two lists
+
+<domain_file>
+# imports stays exactly same for all domain files
+# this python code should be executed without any python syntax errors
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class DomainName(Domain):
+	# let's think step by step and correctly define all the aspects of a domain file
+	# making sure that the list of types, predicates, and actions comprehensively define the give domain
+    Type1 = create_type("Type1")
+    Type2 = create_type("Type2")
+
+	# making sure that all the predicates needed are defined below
+	# predicates have all the arguments needed along with the types
+    # let's not have two predicates with the same name
+    # let's make sure two arguments of a predicate function doesn't have same names. That would be a python syntax error.
+    @predicate(Type1, Type2)
+    def predicate1(self, arg1, arg2):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+    @predicate(Type1)
+    def predicate2(self, arg1):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+	# let's define a list of actions that comprehensively define the given domain
+	# the names for actions are always given precisely in the domain description, using only those actions
+	# making sure that each action is defined with :parameters where every arguments needed for preconditions and effects are specified
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure preconditions is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure effects is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1, Type2, Type2)
+    def action1(self, arg1, arg2, arg3):
+        precond = [self.predicate1(arg1, arg3), self.predicate2(arg1)]
+        effect = [~self.predicate1(arg1, arg2), self.predicate2(arg3)]
+        return precond, effect
+
+	# writing the definition of action1 which is one of the action given in domain description
+	# first defining all the parameters needed for predicates in preconditions and effects
+	# making sure :precondition is logically correct and aligns with the pre-conditions where action1 could be performed
+	# making sure :effect is logically correct and aligns with the post-conditions or results of action being performed
+    @action(Type1)
+    def action2(self, arg1):
+        precond = [self.predicate2(arg1)]
+        effect = [~self.predicate2(arg1)]
+        return precond, effect
+</domain_file>
+
+Notes for generating domain file: 
+- the above example file is only for understanding the syntax
+- type1 & type2 are only representative and should be replaced with appropriate types. There could be any number of types.
+- predicate1 & predicate2 are only representative and should be replaced with appropriate predicates. There could be any number of predicates.
+- action1 & action2 are only representative and should be replaced with appropriate actions. There could be any number of actions.
+- arg1 & arg2 are only representative and should be replaced with appropriate arguments for predicates and in preconditions and effects.
+- Use predicates with arguments of the right type as declared in domain file
+- All the arguments to any :precondition or :effect of an action should be declared in :parameters as input arguments
+- Verify and reason about correctness by reiterating the reasoning behind different predicates and actions
+
+
+
+
+Python representation of PDDL problem file contains problem name, domain name, objects in this problem instance, init state of objects, and goal state of objects.
+Based on the natural language problem description, identify the relevant objects for this problems with their names and types.
+Represent the initial state with the appropriate predicates and object arguments. Represent the goal state with the appropriate predicates and object arguments.
+Python representation of PDDL problem file has a definitive syntax that must be followed for any problem. An abstract example is given below.
+
+<problem_file>
+# imports stays the same for all problem files
+# Assume DomainName is declared just before the problem file
+# this python code should be executed correctly without any syntax errors
+from py2pddl import goal, init
+
+# let's define all the aspects of a problem file below starting with domain, objects, init state, and goal state
+
+class ProblemName(DomainName):
+	# making sure of defining all the objects that are required to define init state and goal state
+    # defining the objects with a list of strings will generate a dict and the object should be retrieve as a dict as in the example below in goal function
+    def __init__(self):
+        super().__init__()
+        self.type1Objs = DomainName.Type1.create_objs([1, 2], prefix="type1Obj")
+        self.type2Objs = DomainName.Type2.create_objs(["type2Obj1", "type2Obj2"])
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @init
+    def init(self):
+        at = [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj1"]),
+              self.predicate2(self.type1Objs[1]),]
+        return at
+
+	# reasoning about the validity of init state that captures the properties of objects in the initial state
+	# defining the correct init state that represent the problem file below
+    # let's index correctly for lists and dicts
+    @goal
+    def goal(self):
+        return [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj2"]),
+                self.predicate2(self.type1Objs[2])]
+</problem_file>
+
+Notes for generating problem file:
+- No need to import DomainName for python problem file. Python Domain file and python problem file would be merged and executed.
+- type1Objs, type2Oobjs, ... are only representative and should be replaced with appropriate objects. There could be any number of obects with their types.
+- init state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define init state
+- goal state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define goal state
+- Use predicates with arguments of the right type as declared in domain file
+- All the objects that would be arguments of predicates in init and goal states should be declared in __init__
+
+
+Here is the natural language description of the domain and problem:
+
+You are in an environment that you explore step by step. You must build and update the Python Representation of PDDL files of the environment based on only your observations.
+Do not create something not appeared in the observations and also do not miss any observations e.g. through closed doors you may assume a room behind.
+Do not assume that there will be a door connecting rooms.
+Your task is always to keep exploration and go to a location you have not visited yet.
+In other words, your goal should go to other not visited location.
+Here are your current observations: Action: move west
+Unknown action: I'm not sure what you mean.
+
+Here are some valid actions you can take: ['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+Return output in strict JSON with two fields only, no extra text:
+{
+  "py_domain": "<python code for the domain class that represents the PDDL domain>",
+  "py_problem": "<python code for the problem class that represents the PDDL problem>"
+}
+
+        ### Previous IR and PDDL history:
+        ### Previous Python IR (edit minimally)
+[py_domain]
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    # Updated move_west: if there is no door, the agent can move directly west
+    @action(Room, Room)
+    def move_west(self, current, new_room):
+        precond = [self.at(current)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+[py_problem]
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        # Only the south door is observed in the current environment
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south'])
+
+    @init
+    def init(self):
+        state = [
+            # Agent starts in the driveway
+            self.at(self.roomObjs['driveway']),
+            # The south door is present and open
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        # The goal is to reach the unvisited west_room; note that no door exists to the west
+        return [self.at(self.roomObjs['west_room'])]
+
+### Previous PDDL (edit minimally)
+[df]
+(define (domain kitchen)
+  (:requirements :typing :strips :disjunctive-preconditions)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_exists ?loc - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (door_exists ?loc1 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (connected ?from ?to ?dir) (or (not (door_exists ?from ?dir)) (door_open ?from ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_exists driveway south)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (at west_room))
+)
+### Environment feedback (if any)
+This is the action you take: move west. You cannot move to that direction. Review the predicate of your actions and the problem files to check the status.
+
+        ### End of history.
+
+        Now, based on the above history and your current observation, update the Python representation of PDDL files. 
+        
+Generated py_domain:
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+Generated py_problem:
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            self.at(self.roomObjs['driveway']),
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south']),
+            self.west_door(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        return [self.at(self.roomObjs['west_room'])]
+
+--Small Loop--: 5 
+[IR→PDDL Prompt] 
+You will be given a class-based Python IR for a PDDL domain (one domain class) and a PDDL problem instance (one problem class),
+plus the current observations and valid actions. Convert that IR into syntactically correct and mutually consistent PDDL.
+
+### Hard constraints (must follow exactly)
+- Declare EXACTLY these two actions with these names and parameter orders:
+  1) :action open-door
+     :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+  2) :action move
+     :parameters (?from - location ?to - location ?dir - direction)
+- Use typed PDDL (declare `location` and `direction` in :types).
+- In problem file's init, you shouldn't have "not ()" but only the single status.
+- The goal must be ground (e.g., (at loc_2)), never (at ?l) or quantifiers.
+- Keep edits minimal if previous PDDL is provided.
+
+### Current observations
+Action: move west
+Unknown action: I'm not sure what you mean.
+
+
+### Valid actions
+['close door to south', 'close door to west', 'move south', 'move west', 'open door to south', 'open door to west']
+
+### (Optional) Previous PDDL (use as base with minimal fixes)
+[Domain file]
+(define (domain kitchen)
+  (:requirements :typing :strips :disjunctive-preconditions)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_exists ?loc - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (door_exists ?loc1 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (connected ?from ?to ?dir) (or (not (door_exists ?from ?dir)) (door_open ?from ?dir)))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[Problem file]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_exists driveway south)
+    (door_open driveway south)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (at west_room))
+)
+
+### (Optional) Planner/validator feedback to fix
+N/A
+
+### (Optional) Environment feedback to fix
+This is the action you take: move west. You cannot move to that direction. Review the predicate of your actions and the problem files to check the status.
+
+### Python IR: domain class
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class KitchenDomain(Domain):
+    Room = create_type('Room')
+    Door = create_type('Door')
+
+    @predicate(Room)
+    def at(self, room):
+        pass
+
+    @predicate(Door)
+    def is_open(self, door):
+        pass
+
+    @predicate(Door)
+    def south_door(self, door):
+        pass
+
+    @predicate(Door)
+    def west_door(self, door):
+        pass
+
+    @predicate(Door)
+    def north_door(self, door):
+        pass
+
+    @predicate(Door)
+    def patio(self, door):
+        pass
+
+    @predicate(Door)
+    def plain(self, door):
+        pass
+
+    @action(Room, Door)
+    def open_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def open_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), ~self.is_open(door)]
+        effect = [self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_south(self, room, door):
+        precond = [self.at(room), self.south_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Door)
+    def close_door_to_west(self, room, door):
+        precond = [self.at(room), self.west_door(door), self.is_open(door)]
+        effect = [~self.is_open(door)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_south(self, current, new_room, door):
+        precond = [self.at(current), self.south_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+    @action(Room, Room, Door)
+    def move_west(self, current, new_room, door):
+        precond = [self.at(current), self.west_door(door), self.is_open(door)]
+        effect = [~self.at(current), self.at(new_room)]
+        return precond, effect
+
+
+### Python IR: problem class
+from py2pddl import init, goal
+
+class KitchenProblem(KitchenDomain):
+    def __init__(self):
+        super().__init__()
+        self.roomObjs = KitchenDomain.Room.create_objs(['kitchen', 'backyard', 'driveway', 'west_room'])
+        self.doorObjs = KitchenDomain.Door.create_objs(['door_south', 'door_west'])
+
+    @init
+    def init(self):
+        state = [
+            self.at(self.roomObjs['driveway']),
+            self.south_door(self.doorObjs['door_south']),
+            self.is_open(self.doorObjs['door_south']),
+            self.west_door(self.doorObjs['door_west'])
+        ]
+        return state
+
+    @goal
+    def goal(self):
+        return [self.at(self.roomObjs['west_room'])]
+
+
+Return output in STRICT JSON with two keys only, no extra commentary:
+{
+  "df": "<PDDL domain file text>",
+  "pf": "<PDDL problem file text>"
+}
+ 
+[PDDL df]
+(define (domain kitchen)
+  (:requirements :typing :strips :disjunctive-preconditions)
+  (:types location direction)
+  (:predicates
+    (at ?loc - location)
+    (connected ?loc1 - location ?loc2 - location ?dir - direction)
+    (door_exists ?loc - location ?dir - direction)
+    (door_open ?loc - location ?dir - direction)
+  )
+
+  (:action open-door
+    :parameters (?loc1 - location ?loc2 - location ?dir - direction)
+    :precondition (and (at ?loc1) (connected ?loc1 ?loc2 ?dir) (door_exists ?loc1 ?dir) (not (door_open ?loc1 ?dir)))
+    :effect (door_open ?loc1 ?dir)
+  )
+
+  (:action move
+    :parameters (?from - location ?to - location ?dir - direction)
+    :precondition (and (at ?from) (connected ?from ?to ?dir) (door_open ?from ?dir))
+    :effect (and (not (at ?from)) (at ?to))
+  )
+)
+
+[PDDL pf]
+(define (problem kitchen-problem)
+  (:domain kitchen)
+  (:objects
+    kitchen backyard driveway west_room - location
+    south west - direction
+  )
+  (:init
+    (at driveway)
+    (door_exists driveway south)
+    (door_open driveway south)
+    (door_exists driveway west)
+    (connected driveway backyard south)
+    (connected driveway west_room west)
+  )
+  (:goal (at west_room))
+)
+Actions from solver(df, pf): ['open door to west', 'move west'] 
+Raw plan text: (OPEN-DOOR DRIVEWAY WEST_ROOM WEST)
+(MOVE DRIVEWAY WEST_ROOM WEST)
+ 
+Current action_queue: ['open door to west', 'move west'] 
+> open door to west 
+ Unknown action: I'm not sure what you mean. 
+Large loop error message: This is the action you take: open door to west. When you try to open door, there is no door here or there is nothing in this direction. If there is no door, you can directly move to that direction.
+ 

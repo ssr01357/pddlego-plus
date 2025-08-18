@@ -1,22 +1,5 @@
-import torch
-import gc
 import json
 import re
-
-def clear_cuda_memory(model_name):
-    """Clears a specific model from cache and frees GPU memory."""
-    global _kani_cache, _hf_engine_cache
-
-    if model_name in _kani_cache:
-        del _kani_cache[model_name]
-
-    if model_name in _hf_engine_cache:
-        del _hf_engine_cache[model_name]
-    gc.collect()
-
-    # Tell PyTorch to release unused cached memory
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
 
 
 def repair_json(content):

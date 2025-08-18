@@ -1,0 +1,93 @@
+
+Python representation of PDDL domain file contains domain name, requirements, types of objects in the domain, predicates, and actions.
+Based on the natural language domain description, identify the actions that are possible.
+Identify action sematics i.e. understand the preconditions under which that action could be done and the effects of the action.
+Then identify appropriate predicates that could enable action semantics i.e. preconditions and effects.
+Python representation of PDDL domain file has a definitive syntax that must be followed for any domain. An abstract example is given below:
+
+In the following Python domain file, the example class DomainName has been created. Its structure is similar to how a PDDL domain should be defined.
+
+Name of the domain is the name of the Python class (DomainName).
+Types are defined as class variables at the top (Type1, Type2).
+Predicates are defined as instance methods decorated with @predicate.
+Actions are defined as instance methods decorated with @action
+
+The positional arguments of @predicate and @action decorators are the types of the respective arguments.
+Methods decorated with @predicate should have empty bodies.
+Methods decorated with @action return a tuple of two lists
+
+<domain_file>
+# imports stays exactly same for all domain files
+from py2pddl import Domain, create_type
+from py2pddl import predicate, action
+
+class DomainName(Domain):
+
+    Type1 = create_type("Type1")
+    Type2 = create_type("Type2")
+
+    @predicate(Type1, Type2)
+    def predicate1(self, arg1, arg2):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+    @predicate(Type1)
+    def predicate2(self, arg1):
+        """Complete the method signature and specify
+        the respective types in the decorator"""
+
+
+    @action(Type1, Type2, Type2)
+    def action1(self, arg1, arg2, arg3):
+        precond = [self.predicate1(arg1, arg3), self.predicate2(arg1)]
+        effect = [~self.predicate1(arg1, arg2), self.predicate2(arg3)]
+        return precond, effect
+
+    @action(Type1)
+    def action2(self, arg1):
+        precond = [self.predicate2(arg1)]
+        effect = [~self.predicate2(arg1)]
+        return precond, effect
+</domain_file>
+
+Notes for generating domain file: 
+- the above example file is only for understanding the syntax
+- type1 & type2 are only representative and should be replaced with appropriate types. There could be any number of types.
+- predicate1 & predicate2 are only representative and should be replaced with appropriate predicates. There could be any number of predicates.
+- action1 & action2 are only representative and should be replaced with appropriate actions. There could be any number of actions.
+- arg1 & arg2 are only representative and should be replaced with appropriate arguments for predicates and in preconditions and effects.
+
+Python representation of PDDL problem file contains problem name, domain name, objects in this problem instance, init state of objects, and goal state of objects.
+Based on the natural language problem description, identify the relevant objects for this problems with their names and types.
+Represent the initial state with the appropriate predicates and object arguments. Represent the goal state with the appropriate predicates and object arguments.
+Python representation of PDDL problem file has a definitive syntax that must be followed for any problem. An abstract example is given below.
+
+<problem_file>
+# imports stays the same for all problem files
+# Assume DomainName is declared just before the problem file
+from py2pddl import goal, init
+
+class ProblemName(DomainName):
+
+    def __init__(self):
+        super().__init__()
+        self.type1Objs = DomainName.Type1.create_objs([1, 2], prefix="type1Obj")
+        self.type2Objs = DomainName.Type2.create_objs(["type2Obj1", "type2Obj2"])
+
+    @init
+    def init(self):
+        at = [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj1"]),
+              self.predicate2(self.type1Objs[1]),]
+        return at
+
+    @goal
+    def goal(self):
+        return [self.predicate1(self.type1Objs[1], self.type2Objs["type2Obj2"]),
+                self.predicate2(self.type1Objs[2])]
+</problem_file>
+
+Notes for generating problem file:
+- No need to import DomainName for python problem file. Python Domain file and python problem file would be merged and executed.
+- type1Objs, type2Oobjs, ... are only representative and should be replaced with appropriate objects. There could be any number of obects with their types.
+- init state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define init state
+- goal state with predicate1 & predicate2 is only representative and should be replaced with appropriate predicates that define goal state
