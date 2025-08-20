@@ -372,6 +372,8 @@ plus the current observations and valid actions. Convert that IR into syntactica
      :parameters (?loc1 - location ?loc2 - location ?dir - direction)
   2) :action move
      :parameters (?from - location ?to - location ?dir - direction)
+
+
 - Use typed PDDL (declare `location` and `direction` in :types).
 - In problem file's init, you shouldn't have "not ()" but only the single status.
 - The goal must be ground (e.g., (at loc_2)), never (at ?l) or quantifiers.

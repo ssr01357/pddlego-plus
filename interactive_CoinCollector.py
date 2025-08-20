@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1, 2, 3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
 
 import time
 from datetime import date
@@ -2210,7 +2210,7 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 i = 0
 num_trials = 2
 # folder_name = "CC_o4_mini_high"
-folder_name = "yewon_coin_0813"
+folder_name = "yewon_coin_0819_sanity_check"
 result_name = folder_name
 model_id1 = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
 model_id2 = "Qwen/Qwen3-32B"
@@ -2238,8 +2238,10 @@ model_id3 = "meta-llama/Llama-3.3-70B-Instruct"
 # run_iterative_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # clear_cuda_memory(model_id1)
 # run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # clear_cuda_memory(model_id2)
 # run_iterative_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # clear_cuda_memory(model_id3)
 # run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")

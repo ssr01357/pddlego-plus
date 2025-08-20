@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1, 2, 3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
 import torch
 import gc
 import time
@@ -30,9 +30,14 @@ _hf_engine_cache: dict[str, HuggingEngine] = {}
 OPENAI_MODELS_LIST = ['gpt-4o','o3-mini',"gpt-4.1","o4-mini", "gpt-5-nano-2025-08-07"]
 ENV_PARAMS = {"gameName": "coin", "gameParams": "numLocations=11,numDistractorItems=0,includeDoors=1,limitInventorySize=0"}
 
+
 def _tail(s, n=4000):
     return s if not s or len(s) <= n else s[-n:]
 
+# can be moved to utils.py
+def _sanitize_valid_actions(infos):
+    vals = sorted(infos.get("validActions", []))
+    return [v for v in vals if v not in ("look around", "inventory")]
 
 def clear_cuda_memory(model_name):
     global _hf_engine_cache
@@ -283,9 +288,9 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
 # Main functions here:
 def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
    
-    for trial in range(start_trial, end_trial): #이건 정답 찾을때까지
+    for trial in range(start_trial, end_trial): 
         retry = 0
-        while retry < 2:  # 이건 에러처리용 다시시도
+        while retry < 2: 
             try:
                 coin_found = False
                 today = date.today()
@@ -307,6 +312,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                 env = TextWorldExpressEnv(envStepLimit=100)
                 env.load(**ENV_PARAMS)
                 obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+                valid_actions = _sanitize_valid_actions(infos)
                 if "coin" in obs.lower():
                     print("Coin found at the beginning!")
                     coin_found = True
@@ -314,14 +320,10 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                 with open(file_name, "a") as f:  # "w" creates a new file or overwrites an existing file
                     f.write(f"Observations: {obs} \n") 
                     f.write(f"Gold path: {env.getGoldActionSequence()} \n")
-                    f.write(f"Valid Actions: {infos['validActions']} \n")
+                    f.write(f"Valid Actions: {valid_actions} \n")
                     f.write(f"taskDescription: {infos['taskDescription']} \n")
-                # 이건 첫번째 tries(=larger loop에서 쓰임)
-
-                # task_description = infos['taskDescription']
-                valid_actions = sorted(infos['validActions'])
-                valid_actions.remove('look around') # 이건 초반에 항상 초기값
-                valid_actions.remove('inventory') # 이건 필요없으니까?
+    
+              
 
                 MAX_STEPS = 20
 
@@ -364,6 +366,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                             obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True) # 여기서 나온 obs, infos는 쓰지도 않음
                             for successful_action in successful_actions: # 초기화 다음, 어떤 행동을 취하기 시작한 후부터의 아웃풋에 주목
                                 obs, reward, done, infos = env.step(successful_action) # <-아... 앞단계에서 검증된거 한꺼번에 넣어주고 다음 action찾으려고
+                            valid_actions = _sanitize_valid_actions(infos)
 
                         action_queue = [] # reset action_queue ()
                         tem_action_queue = []
@@ -542,6 +545,7 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
 
                 env.load(**ENV_PARAMS)
                 obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+                valid_actions = _sanitize_valid_actions(infos)
                 if "coin" in obs.lower():
                     print("Coin found at the beginning!")
                     coin_found = True
@@ -549,14 +553,8 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
                 with open(file_name, "a") as f:
                     f.write(f"Observations: {obs} \n")
                     f.write(f"Gold path: {env.getGoldActionSequence()} \n")
-                    f.write(f"Valid Actions: {infos['validActions']} \n")
+                    f.write(f"Valid Actions: {valid_actions} \n")
                     f.write(f"taskDescription: {infos['taskDescription']} \n")
-
-                valid_actions = sorted(infos['validActions'])
-                if 'look around' in valid_actions:
-                    valid_actions.remove('look around')
-                if 'inventory' in valid_actions:
-                    valid_actions.remove('inventory')
 
                 MAX_STEPS = 20
                 brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
@@ -592,6 +590,7 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
                             obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
                             for act in successful_actions:
                                 obs, reward, done, infos = env.step(act)
+                            valid_actions = _sanitize_valid_actions(infos)
 
                         # Reset action queues and temporary memory for this large-loop iteration.
                         action_queue = []
@@ -764,6 +763,7 @@ def run_pyir_model(model_name, start_trial=0, end_trial=11, folder_name="3_0421_
                 env = TextWorldExpressEnv(envStepLimit=100)
                 env.load(**ENV_PARAMS)
                 obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+                valid_actions = _sanitize_valid_actions(infos)
                 if "coin" in obs.lower():
                     print("Coin found at the beginning!")
                     coin_found = True
@@ -771,14 +771,9 @@ def run_pyir_model(model_name, start_trial=0, end_trial=11, folder_name="3_0421_
                 with open(file_name, "a") as f:
                     f.write(f"Observations: {obs} \n")
                     f.write(f"Gold path: {env.getGoldActionSequence()} \n")
-                    f.write(f"Valid Actions: {infos['validActions']} \n")
+                    f.write(f"Valid Actions: {valid_actions} \n")
                     f.write(f"taskDescription: {infos['taskDescription']} \n")
 
-                valid_actions = sorted(infos['validActions'])
-                if 'look around' in valid_actions:
-                    valid_actions.remove('look around')
-                if 'inventory' in valid_actions:
-                    valid_actions.remove('inventory')
 
                 MAX_STEPS = 20
                 brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
@@ -818,6 +813,7 @@ def run_pyir_model(model_name, start_trial=0, end_trial=11, folder_name="3_0421_
                             obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
                             for act in successful_actions:
                                 obs, reward, done, infos = env.step(act)
+                            valid_actions = _sanitize_valid_actions(infos)
 
                         action_queue = []
                         tem_action_queue = []
@@ -958,16 +954,17 @@ def run_pyir_model(model_name, start_trial=0, end_trial=11, folder_name="3_0421_
 
 
 i = 0
-num_trials = 5
+num_trials = 3
 # folder_name = "CC_o4_mini_high"
-folder_name = "yewon_coin_0818_easier"
+# folder_name = "yewon_coin_0818_easier2_toreport_2"
+folder_name = "yewon_coin_0819_pyir" 
 # 1
 
 result_name = folder_name
 model_id1 = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
 model_id2 = "Qwen/Qwen3-32B"
 model_id3 = "meta-llama/Llama-3.3-70B-Instruct"
-openai_model = "gpt-4.1"
+openai_model = "o4-mini"
 ## Run PlanGen models
 # run_baseline_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # clear_cuda_memory(model_id1)
@@ -992,4 +989,5 @@ openai_model = "gpt-4.1"
 # run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 run_pyir_model(openai_model, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_pyir_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_pyir_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_pyir_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
