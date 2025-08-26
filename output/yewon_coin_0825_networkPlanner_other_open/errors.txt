@@ -1,0 +1,248 @@
+[PDDLego+] Trial 2 (Attempt 1) | Model: Qwen/Qwen3-32B | Goal Type: detailed | Failed: Model response is not valid JSON after repair attempts:
+<think>
+Okay, let's start by looking at the user's problem. They're trying to model their environment using PDDL, and they've encountered some issues with the move action not working as expected when there's no door. The error message mentioned that when trying to open a door that doesn't exist, they can directly move to that direction. 
+
+First, I need to check the domain file. The current move action's precondition includes an 'or' clause that checks if the door is open or not closed. But the user's observation says that if there's no door, you can move directly. The previous setup might not handle the case where there's no door at all.
+
+Looking at the problem file, the user's latest observation is in the backyard, where they can see the street to the east. However, the problem file doesn't have a door between backyard and street. The move action's precondition might be incorrectly requiring a door to exist, even if there's none. 
+
+So, the key issue is that the move action's precondition should allow moving to a direction even if there's no door, but the current setup might be forcing a door check. The user's note says if there's no door, you can move directly. Therefore, the move action's precondition should not require a door to exist. Instead, it should only check if the path is clear, which might mean removing the door-related conditions from the move action.
+
+Wait, but the user's valid actions include 'open door to east' which implies that sometimes there is a door. So maybe the move action should only be used when there's an open door, and if there's no door, the move is allowed without needing to open anything. But the user's error message says when there's no door, you can directly move. So perhaps the move action's precondition should not check for doors at all in cases where there's no door. 
+
+Hmm, maybe the move action's current precondition is too restrictive. The user wants to move directly if there's no door. So the move action's precondition should be that either the door is open, or there's no door. But how to model that in PDDL? The current setup uses an 'or' with door-open or not door-closed. But if there's no door at all, the door-closed predicate might not be present, so (not (door-closed ...)) would be true. However, if the door doesn't exist, then the door-closed predicate isn't in the init, so (not (door-closed ...)) would be true. Therefore, the move action would allow moving even if there's no door. 
+
+Wait, but in the problem file, the user hasn't added a door between backyard and street. So when trying to move east from the backyard to the street, the move action's precondition would check (door-open ... east) or (not (door-closed ... east)). Since there's no door, the door-closed predicate isn't in the init, so (not (door-closed ... east)) is true, allowing the move. 
+
+But the user's error was that when trying to open a door that doesn't exist, they can move directly. So maybe the move action's precondition is correct, but the problem file is missing the door-closed for the street. Wait, in the problem file's init, there's no mention of a door between backyard and street. So when the user tries to move east from backyard to street, the move action's precondition would check if the door is open or not closed. Since there's no door, the door-closed is not present, so (not (door-closed ...)) is true, allowing the move. 
+
+But in the user's latest observation, they are in the backyard and can see the street to the east. So the move action should allow moving to the street without needing to open a door. Therefore, the problem file's init is missing the door-closed for backyard and street. Wait, no, if there's no door, then door-closed shouldn't be present. The user's observation says there's a closed patio door to the west, but to the east there's the street with no door. So the problem file's init should not have a door-closed for backyard and street. Therefore, the move action's precondition would allow moving east to street because (not (door-closed ...)) is true. 
+
+But the user's error was that when trying to open a door to east (which doesn't exist), they can move directly. So the move action's precondition is correct, but the problem file's goal is set to (at street), which is a valid location. 
+
+Wait, the problem file's init has (at backyard), and the goal is (at street). The move action allows moving to street if there's no door. So the plan would be to move east from backyard to street. Therefore, the problem file should have the street as a location, and the move action should allow moving to it. 
+
+But in the problem file's init, there's no door between backyard and street. So the move action's precondition would allow moving there. Therefore, the domain and problem files should be correct. 
+
+Wait, but the user's error message was about trying to open a door to east when there's no door. The open-door action's precondition requires the door to be closed. Since there's no door, the open-door action can't be used. Therefore, the user should instead use the move action directly. 
+
+So the domain and problem files are correct. The user's error might be due to a different reason, but according to the provided info, the move action should work. 
+
+But the user's latest observation is that they can move north back to the backyard. The problem file's init has (at backyard), so moving north would go to kitchen. But the user's latest action was move north from driveway to backyard, which is already handled. 
+
+In conclusion, the domain and problem files seem correct. The move action allows moving to street if there's no door, and the problem file's goal is to reach street. So the answer should be the existing df and pf without changes.
+</think>
+
+{
+    "df": "(define (domain exploration)\n    (:types location direction)\n    (:predicates\n        (at ?loc - location)\n        (door-closed ?loc1 - location ?loc2 - location ?dir - direction)\
+[PDDLego+] Trial 2 (Attempt 2) | Model: Qwen/Qwen3-32B | Goal Type: detailed | Failed: Model response is not valid JSON after repair attempts:
+<think>
+Okay, let's tackle this problem step by step. The user wants me to generate the correct PDDL domain and problem files based on their observations and the previous attempts. Let me start by understanding the current scenario.
+
+First, the user is in the kitchen, and they've just looked around. They see a closed patio door to the south and a closed plain door to the west. The valid actions are to open doors to south or west, close doors to those directions, or move in those directions. The goal should be to reach a new location that hasn't been visited yet.
+
+Looking at the previous domain and problem files, there were some issues with the move action's preconditions and the problem file's goal. The user mentioned errors like "goal can be simplified to FALSE" and issues with moving when there's no door. 
+
+In the domain file, the move action had a precondition that included an OR with a NOT, which might not be valid in PDDL. PDDL doesn't support negated atoms in preconditions directly; instead, they should be handled with the not operator. Also, the previous move action's precondition might have been incorrect, allowing movement even when there's no door, which led to errors.
+
+For the problem file, the goal was set to 'street', but the user might not have a door open to the street, making the goal unreachable. The correct approach is to set the goal to a location that's connected via an open door or can be moved to directly if there's no door.
+
+In the current observations, the user hasn't moved yet, so the initial location is the kitchen. The valid next steps are to open the west door to the pantry or the south door to the backyard. The goal should be to reach the pantry or backyard, whichever is unvisited. Since the user is in the kitchen, the pantry is a new location, so the goal should be set to 'pantry'.
+
+Now, I need to adjust the domain file to fix the move action's precondition. The move action should only be possible if there's an open door in the direction. The previous version had an OR with a NOT, which is incorrect. The correct precondition is that the door is open. Also, the problem file's goal should be set to 'pantry' since that's the next unvisited location.
+
+I'll revise the domain file to ensure the move action's precondition correctly checks for an open door. The problem file's init will have the kitchen as the starting location, and the door to the pantry is closed. The goal is to reach the pantry. 
+
+I need to make sure that the problem file's init includes the correct door states. Since the west door is closed, the user needs to open it first. The goal is to be at the pantry, which hasn't been visited yet. 
+
+Double-checking the parameters for the actions: open-door requires the current location, the target location, and direction. The move action requires the from, to, and direction. The problem file's init should have the door-closed between kitchen and pantry to the west. The goal is to be at pantry.
+
+This should resolve the previous errors by ensuring the move action only works when the door is open and the goal is set to a reachable, unvisited location.
+</think>
+
+```json
+{
+    "df": "(define (domain exploration)\n    (:types location direction)\n    (:predicates\n        (at ?loc - location)\n        (door-closed ?loc1 - location ?loc2 - location ?dir - direction)\n        (door-open ?loc1 - location ?loc2 - location ?dir - direction)\n    )\n    (:action open-door\n        :parameters (?loc1 - location ?loc2 - location ?dir - direction)\n        :precondition (and (at ?loc1) (door-closed ?loc1 ?loc2 ?dir))\n        :effect (and (not (door-closed ?loc1 ?loc2 ?dir)) (door-open ?loc1 ?loc2 ?dir))\n    )\n    (:action move\n        :parameters (?from - location ?to -
+[PDDLego+] Trial 3 (Attempt 1) | Model: Qwen/Qwen3-32B | Goal Type: detailed | Failed: Model response is not valid JSON after repair attempts:
+<think>
+Okay, let me try to figure out how to fix the PDDL files based on the user's latest input. The user mentioned that the previous response was incomplete, so I need to make sure the domain and problem files are correctly formatted.
+
+First, looking at the domain file (df), the last line was cut off. The move action's effect was missing. The correct effect should be (and (not (at ?from)) (at ?to)). I need to complete that part.
+
+In the problem file (pf), the user's previous attempt was also incomplete. The initial state (init) had some missing parts. The kitchen is the starting location, and there are closed doors to the south (patio) and west (pantry). I need to ensure that all doors are correctly listed as closed initially. Also, the goal should be to reach a location not yet visited, which in this case would be either the pantry or the patio. Since the user's last action was looking around in the kitchen, the goal should be to reach one of those unvisited locations.
+
+Wait, the user's current observations are just the look around in the kitchen. So the problem file's init should reflect that the agent is at the kitchen, with closed doors to the south (patio) and west (pantry). The goal should be to reach either the pantry or the patio, whichever is not visited yet. Since the user hasn't moved yet, the goal should be to go to the pantry or patio. Let's pick the pantry as the goal since it's mentioned first in the observations.
+
+So, the problem file's goal should be (at pantry). I need to make sure that the pantry is defined as a location and that the doors are correctly set up. Also, check that the directions are properly listed.
+
+I should also verify that the domain file's actions are correctly defined. The open-door action requires the door to be closed, and the move action requires the door to be open. The parameters and preconditions should match the user's valid actions.
+
+Putting it all together, the domain file should have the correct actions with their parameters, preconditions, and effects. The problem file should have the correct initial state and goal based on the current observations.
+</think>
+
+{
+    "df": "(define (domain exploration)\n    (:types location direction)\n    (:predicates\n        (at ?loc - location)\n        (door-closed ?loc1 - location ?loc2 - location ?dir - direction)\n        (door-open ?loc1 - location ?loc2 - location ?dir - direction)\n    )\n    (:action open-door\n        :parameters (?loc1 - location ?loc2 - location ?dir - direction)\n        :precondition (and (at ?loc1) (door-closed ?loc1 ?loc2 ?dir))\n        :effect (and (not (door-closed ?loc1 ?loc2 ?dir)) (door-open ?loc1 ?loc2 ?dir))\n    )\n    (:action move\n        :parameters (?from - location ?to - location ?dir - direction)\n        :precondition (and (at ?from) (door-open ?from
+[PDDLego+] Trial 3 (Attempt 2) | Model: Qwen/Qwen3-32B | Goal Type: detailed | Failed: Model response is not valid JSON after repair attempts:
+<think>
+Okay, let me try to work through this step by step. The user is trying to generate correct PDDL files based on their observations. The main issue here is the error message about trying to open a door to the east when there's no door there. The user mentioned that if there's no door, they can directly move to that direction. 
+
+Looking at the current problem file, the goal is to reach the street. The observations show that in the backyard, the user sees the street to the east. However, there's a door-closed predicate for backyard street east. That might be causing the issue because if the door is closed, the move action can't proceed unless the door is opened. But the user tried to open the door to the east and got an error, implying there's no door there.
+
+Wait, the user's observation says that in the backyard, to the east is the street. If there's no door, then the move action should be possible without needing to open a door. The current PDDL setup requires a door-open predicate for moving, but if there's no door, the move should be allowed directly. 
+
+So the problem is that the problem file has (door-closed backyard street east), which suggests there's a door, but the user's action to open it is invalid because there's actually no door. Therefore, the correct approach is to remove the door-closed predicate for the east direction from the backyard to the street and instead allow direct movement if there's no door. 
+
+In the domain file, the move action's precondition requires (door-open ?from ?to ?dir). If there's no door, this precondition isn't met, so the move can't happen. To fix this, the domain should allow moving without a door if there's nothing blocking. But the user's valid actions include 'move east', which implies that in some cases, movement is possible without a door. 
+
+Wait, the user's valid actions include 'move south', 'move west', etc., which suggests that movement can be done without needing to open a door if the path is clear. So maybe the problem is that the problem file incorrectly added a door-closed for the street, which doesn't exist. 
+
+In the observations, when the user is in the backyard, they see the street to the east. Since there's no door mentioned, the problem file shouldn't have a door-closed or door-open for that direction. Instead, the move action should be allowed directly. 
+
+Therefore, the fix is to remove the (door-closed backyard street east) from the problem's init section. That way, the move action can proceed to the street without needing to open a door, as there's no door there. 
+
+So the updated problem file should have the door-open predicates for existing doors (kitchen-pantry, kitchen-backyard, etc.) and remove the door-closed for the backyard-street east. The goal remains (at street). 
+
+I need to check if the domain's move action allows moving without a door. The current domain's move action requires (door-open ?from ?to ?dir). If there's no door, this would fail. But the user's valid actions include moving east to the street, which implies that the move should be possible without a door. 
+
+Wait, this suggests that the domain's move action is incorrectly defined. The move action should have a precondition that either the door is open or there's no door. However, the user's domain only allows moving if the door is open. This is a problem because in cases where there's no door, the move action can't be used. 
+
+But the user's valid actions include 'move east' even when there's no door. So the domain's move action needs to be adjusted to allow movement without a door. However, the user's instructions specify that the move action must have the parameters (?from - location ?to - location ?dir - direction) and the preconditions as given. 
+
+Wait, the user's instructions say that if there's no door, you can directly move to that direction. So the move action should be allowed even if there's no door. But the current domain's move action requires (door-open ?from ?to ?dir
+[PDDLego+] Trial 4 (Attempt 1) | Model: Qwen/Qwen3-32B | Goal Type: detailed | Failed: Model response is not valid JSON after repair attempts:
+<think>
+Okay, let me try to figure this out. The user is trying to generate PDDL files for their environment based on their observations. They mentioned that after opening the door to the west and moving into the pantry, they can see the kitchen to the east. The problem is that the current problem file has the goal set to (at pantry), which they've already achieved. So the next step should be to set the goal to a new, unvisited location.
+
+Looking at the observations, after moving to the pantry, the user hasn't visited the backyard or the driveway yet. The previous problem file had the kitchen connected to the backyard via a closed door to the south. Since the user hasn't opened that door yet, the next goal should be to go to the backyard. 
+
+In the problem file, the current init includes (door-closed kitchen pantry west) and (door-closed kitchen backyard south). After opening the west door to the pantry, the pantry's door to the kitchen is now open. But the south door to the backyard is still closed. The user's next goal should be to reach the backyard, so the goal in the problem file should be updated to (at backyard). 
+
+Also, the move action requires that the door is open. Since the kitchen's south door to the backyard is still closed, the user needs to open it first. The domain file's open-door action is correctly defined, so the problem file should reflect that the kitchen's south door is closed, which it already is. 
+
+Wait, but in the current problem file, the goal is (at pantry), which the user has already achieved. So the next step is to change the goal to (at backyard) since that's the next unvisited location. 
+
+Also, the user's observations show that after moving to the pantry, they can see the kitchen to the east. The problem file should have the door-open between pantry and kitchen. The previous problem file had (door-closed kitchen pantry west), but after opening it, it should be (door-open kitchen pantry west) and (door-open pantry kitchen east). 
+
+Wait, in the problem file's init, the door between kitchen and pantry is initially closed. After the user opens it, it becomes open. So the problem file's init should reflect that door as open now. 
+
+So the updated problem file should have (door-open kitchen pantry west) and (door-open pantry kitchen east) to represent the open door between kitchen and pantry. The goal should be (at backyard) since that's the next unvisited location. 
+
+Also, the user is currently in the pantry, so the (at pantry) should be in the init. 
+
+Putting it all together, the problem file's init should include the open door between kitchen and pantry, and the closed door to the backyard. The goal is to reach the backyard. 
+
+The domain file seems correct as it is, with the open-door and move actions properly defined. 
+
+So the final answer should adjust the problem file's init to reflect the open door between kitchen and pantry and set the goal to backyard.
+</think>
+
+{
+    "df": "(define (domain exploration)\n    (:types location direction)\n    (:predicates\n        (at ?loc - location)\n        (door-closed ?loc1 - location ?loc2 - location ?dir - direction)\n        (door-open ?loc1 - location ?loc2 - location ?dir - direction)\n    )\n    (:action open-door\n        :parameters (?loc1 - location ?loc2 - location ?dir - direction)\n        :precondition (and (at ?loc1) (door-closed ?loc1 ?loc2 ?dir))\n        :effect (and (not (door-closed ?loc1 ?loc2 ?dir)) (door-open ?loc1 ?loc2 ?dir))\n    )\n    (:action move\n        :parameters (?from - location ?to - location ?dir - direction)\n        :precondition (and (at ?from) (door-open ?from ?to ?dir))\n        :effect (and
+[PDDLego+] Trial 4 (Attempt 2) | Model: Qwen/Qwen3-32B | Goal Type: detailed | Failed: Model response is not valid JSON after repair attempts:
+<think>
+Okay, let's see. The user is trying to generate PDDL files for their exploration environment. The current observations show that after opening the south door from the kitchen, they enter the backyard. The problem file's goal is set to (at patio), but the user is now in the backyard and needs to reach other unvisited locations like the driveway or street.
+
+First, I need to check the domain file. The actions are open-door and move. The open-door action requires a door to be closed, and move requires the door to be open. The problem file has (door-closed kitchen patio south) initially, but after opening, it should become open. However, in the observations, after opening the south door, the user moves to the backyard. So the problem file's init should reflect the current state after these actions.
+
+Wait, the previous problem file had the goal as (at patio), but the user has now moved to the backyard. The goal should be updated to a new unvisited location, like the driveway or street. The user's task is to go to a location not visited yet, so the goal needs to change from patio to driveway or street.
+
+Looking at the observations, after moving to the backyard, the user sees the driveway to the south and the street to the east. Since the goal should be a new location, the problem file's goal should now be (at driveway) or (at street). Also, the init section needs to include the current state after opening the door and moving. So the (at kitchen) should be changed to (at backyard), and the door-closed for kitchen patio south should be door-open, and door-open between kitchen and backyard south.
+
+Additionally, the problem file's objects need to include the new locations mentioned, like backyard, driveway, and street. The previous problem file only had kitchen, pantry, and patio. So adding backyard, driveway, and street to the objects list is necessary.
+
+Also, the door predicates need to be updated. The user opened the south door from the kitchen to the backyard, so (door-open kitchen backyard south) and (door-open backyard kitchen north) should be in the init. Also, the west door in the backyard is closed, leading to another location (maybe a patio or another room), but the user hasn't explored that yet. However, based on observations, the west door in the backyard is closed, so (door-closed backyard ?west-location west) might be needed, but since the user hasn't specified what's behind it, maybe it's better to assume a new location if necessary. But according to the user's instructions, we shouldn't assume rooms behind closed doors unless observed. So perhaps just keep the existing doors and add the new ones based on the current observations.
+
+So the updated problem file should have:
+
+- Objects: kitchen, pantry, backyard, driveway, street, etc.
+- Init: (at backyard), (door-open kitchen backyard south), (door-open backyard kitchen north), (door-open kitchen pantry west), (door-open pantry kitchen east), (door-closed backyard driveway south), (door-closed backyard street east)
+- Goal: (at driveway) or (at street)
+
+Wait, the user's current location is the backyard, and the goal should be a new unvisited location. The user has seen the driveway and street from the backyard. So the goal should be either driveway or street. Let's pick driveway as the next target.
+
+Also, the previous problem file had (door-closed kitchen patio south), but after opening, it's now (door-open kitchen backyard south). So the patio might not be the correct location here. The user mentioned the backyard, so the door connects kitchen to backyard, not patio. So the problem file's objects should have backyard instead of patio in the door predicates.
+
+Therefore, the corrected problem file should have:
+
+- Objects: kitchen, pantry, backyard, driveway, street, south, west, east, north
+- Init: (at backyard), (door-open kitchen backyard south), (door-open backyard kitchen north), (door-open kitchen pantry west), (door-open
+[PDDLego+] Trial 0 (Attempt 1) | Model: meta-llama/Llama-3.2-70B-Instruct | Goal Type: detailed | Failed: meta-llama/Llama-3.2-70B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=<your_token>`
+[PDDLego+] Trial 0 (Attempt 2) | Model: meta-llama/Llama-3.2-70B-Instruct | Goal Type: detailed | Failed: meta-llama/Llama-3.2-70B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=<your_token>`
+[PDDLego+] Trial 1 (Attempt 1) | Model: meta-llama/Llama-3.2-70B-Instruct | Goal Type: detailed | Failed: meta-llama/Llama-3.2-70B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=<your_token>`
+[PDDLego+] Trial 1 (Attempt 2) | Model: meta-llama/Llama-3.2-70B-Instruct | Goal Type: detailed | Failed: meta-llama/Llama-3.2-70B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=<your_token>`
+[PDDLego+] Trial 2 (Attempt 1) | Model: meta-llama/Llama-3.2-70B-Instruct | Goal Type: detailed | Failed: meta-llama/Llama-3.2-70B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=<your_token>`
+[PDDLego+] Trial 2 (Attempt 2) | Model: meta-llama/Llama-3.2-70B-Instruct | Goal Type: detailed | Failed: meta-llama/Llama-3.2-70B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=<your_token>`
+[PDDLego+] Trial 3 (Attempt 1) | Model: meta-llama/Llama-3.2-70B-Instruct | Goal Type: detailed | Failed: meta-llama/Llama-3.2-70B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=<your_token>`
+[PDDLego+] Trial 3 (Attempt 2) | Model: meta-llama/Llama-3.2-70B-Instruct | Goal Type: detailed | Failed: meta-llama/Llama-3.2-70B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=<your_token>`
+[PDDLego+] Trial 4 (Attempt 1) | Model: meta-llama/Llama-3.2-70B-Instruct | Goal Type: detailed | Failed: meta-llama/Llama-3.2-70B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=<your_token>`
+[PDDLego+] Trial 4 (Attempt 2) | Model: meta-llama/Llama-3.2-70B-Instruct | Goal Type: detailed | Failed: meta-llama/Llama-3.2-70B-Instruct is not a local folder and is not a valid model identifier listed on 'https://huggingface.co/models'
+If this is a private repository, make sure to pass a token having permission to this repo either by logging in with `hf auth login` or by passing `token=<your_token>`
+[PDDLego+] Trial 0 (Attempt 1) | Model: mistralai/Mixtral-8x7B-Instruct-v0.1 | Goal Type: detailed | Failed: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1.
+403 Client Error. (Request ID: Root=1-68ad1dee-7581875f3b42c97b7c4bd499;8c150c47-a8c2-40ab-97b3-a96876e45265)
+
+Cannot access gated repo for url https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/resolve/main/config.json.
+Access to model mistralai/Mixtral-8x7B-Instruct-v0.1 is restricted and you are not in the authorized list. Visit https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1 to ask for access.
+[PDDLego+] Trial 0 (Attempt 2) | Model: mistralai/Mixtral-8x7B-Instruct-v0.1 | Goal Type: detailed | Failed: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1.
+403 Client Error. (Request ID: Root=1-68ad1def-4d871d1679e3b1f80677e3a2;dd566da8-d115-426a-8ec9-db2b9da15c1e)
+
+Cannot access gated repo for url https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/resolve/main/config.json.
+Access to model mistralai/Mixtral-8x7B-Instruct-v0.1 is restricted and you are not in the authorized list. Visit https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1 to ask for access.
+[PDDLego+] Trial 1 (Attempt 1) | Model: mistralai/Mixtral-8x7B-Instruct-v0.1 | Goal Type: detailed | Failed: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1.
+403 Client Error. (Request ID: Root=1-68ad1def-73a3231748ce45ab3c1024a2;297a89c5-44c1-4d0f-a5ff-58c13e163b27)
+
+Cannot access gated repo for url https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/resolve/main/config.json.
+Access to model mistralai/Mixtral-8x7B-Instruct-v0.1 is restricted and you are not in the authorized list. Visit https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1 to ask for access.
+[PDDLego+] Trial 1 (Attempt 2) | Model: mistralai/Mixtral-8x7B-Instruct-v0.1 | Goal Type: detailed | Failed: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1.
+403 Client Error. (Request ID: Root=1-68ad1def-21a576bc092461741b941b86;9d7c39f0-27f2-4440-b548-2d62305d5389)
+
+Cannot access gated repo for url https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/resolve/main/config.json.
+Access to model mistralai/Mixtral-8x7B-Instruct-v0.1 is restricted and you are not in the authorized list. Visit https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1 to ask for access.
+[PDDLego+] Trial 2 (Attempt 1) | Model: mistralai/Mixtral-8x7B-Instruct-v0.1 | Goal Type: detailed | Failed: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1.
+403 Client Error. (Request ID: Root=1-68ad1df0-66ae2084283803603a95d0d3;2d6c4d96-529b-4124-9460-c393401dbe49)
+
+Cannot access gated repo for url https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/resolve/main/config.json.
+Access to model mistralai/Mixtral-8x7B-Instruct-v0.1 is restricted and you are not in the authorized list. Visit https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1 to ask for access.
+[PDDLego+] Trial 2 (Attempt 2) | Model: mistralai/Mixtral-8x7B-Instruct-v0.1 | Goal Type: detailed | Failed: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1.
+403 Client Error. (Request ID: Root=1-68ad1df0-1a6775b839f13f394917859a;096fcef1-9674-437f-ae68-691cd58b12af)
+
+Cannot access gated repo for url https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/resolve/main/config.json.
+Access to model mistralai/Mixtral-8x7B-Instruct-v0.1 is restricted and you are not in the authorized list. Visit https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1 to ask for access.
+[PDDLego+] Trial 3 (Attempt 1) | Model: mistralai/Mixtral-8x7B-Instruct-v0.1 | Goal Type: detailed | Failed: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1.
+403 Client Error. (Request ID: Root=1-68ad1df0-1f7cccc960b591b2622d3fd7;0da73b40-9446-4d27-99cf-d1cf543770fc)
+
+Cannot access gated repo for url https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/resolve/main/config.json.
+Access to model mistralai/Mixtral-8x7B-Instruct-v0.1 is restricted and you are not in the authorized list. Visit https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1 to ask for access.
+[PDDLego+] Trial 3 (Attempt 2) | Model: mistralai/Mixtral-8x7B-Instruct-v0.1 | Goal Type: detailed | Failed: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1.
+403 Client Error. (Request ID: Root=1-68ad1df1-191e1f1474ce696742214266;4eda98cd-c75e-490a-8a7f-3495f3e54053)
+
+Cannot access gated repo for url https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/resolve/main/config.json.
+Access to model mistralai/Mixtral-8x7B-Instruct-v0.1 is restricted and you are not in the authorized list. Visit https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1 to ask for access.
+[PDDLego+] Trial 4 (Attempt 1) | Model: mistralai/Mixtral-8x7B-Instruct-v0.1 | Goal Type: detailed | Failed: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1.
+403 Client Error. (Request ID: Root=1-68ad1df1-2bda5f327591b62f0ac23201;3c15b592-b136-4d85-aa2d-2c1d1e820c49)
+
+Cannot access gated repo for url https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/resolve/main/config.json.
+Access to model mistralai/Mixtral-8x7B-Instruct-v0.1 is restricted and you are not in the authorized list. Visit https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1 to ask for access.
+[PDDLego+] Trial 4 (Attempt 2) | Model: mistralai/Mixtral-8x7B-Instruct-v0.1 | Goal Type: detailed | Failed: You are trying to access a gated repo.
+Make sure to have access to it at https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1.
+403 Client Error. (Request ID: Root=1-68ad1df1-2371d4a95d8eb03e62614299;561a6e38-7b45-4fb4-aab2-a81c3ec95ccf)
+
+Cannot access gated repo for url https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1/resolve/main/config.json.
+Access to model mistralai/Mixtral-8x7B-Instruct-v0.1 is restricted and you are not in the authorized list. Visit https://huggingface.co/mistralai/Mixtral-8x7B-Instruct-v0.1 to ask for access.

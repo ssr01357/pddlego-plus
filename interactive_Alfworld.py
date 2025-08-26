@@ -1366,7 +1366,8 @@ def run_iterative_model(model_name = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B"
                 trial_record = []
                 
                 # each trial reset environment ===================
-                problem_id = random.randint(0, 9)
+                # problem_id = random.randint(0, 9)
+                problem_id = 2
                 problem = os.path.dirname(PROBLEMS[problem_id])
                 problem_type_dic = {0: 'clean', 1: 'basic', 2: 'basic', 3:'slice & heat', 4: 'heat',\
                     5:'use', 6:'clean', 7: 'use', 8: 'basic', 9:'cool'}

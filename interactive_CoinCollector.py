@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "4, 5, 6, 7"
 
 import time
 from datetime import date
@@ -20,6 +20,8 @@ import requests
 from textworld_express import TextWorldExpressEnv
 
 from openai import OpenAI
+
+# from solver import run_solver
 
 import torch
 import gc
@@ -101,8 +103,8 @@ def run_solver(domain_file, problem_file, solver, max_retries=3):
 def get_action_from_pddl(df, pf):
     result = run_solver(df, pf, "dual-bfws-ffparser")
     action = result['output']['plan']
-    err_2 = result['stderr']
-    return map_actions(action), err_2 # 액션의 리스트( = 플랜)을 반환함
+    err_2 = result['stderr'] + result['stdout']
+    return map_actions(action), err_2, result # 액션의 리스트( = 플랜)을 반환함
 
 OPENAI_MODELS_LIST = ['gpt-4o','o3-mini',"gpt-4.1","o4-mini"]
 def run_llm(prompt, model_name):
@@ -170,7 +172,7 @@ def run_llm(prompt, model_name):
                 engine = HuggingEngine(
                     model_id=model_name,
                     use_auth_token=True,
-                    model_load_kwargs={"device_map": "auto", "trust_remote_code": True}
+                    model_load_kwargs={"device_map": "auto"} # , "trust_remote_code": True
                 )
                 _hf_engine_cache[model_name] = engine
                 _kani_cache[model_name] = Kani(engine, system_prompt="")
@@ -568,7 +570,7 @@ def llm_to_pddl(model_name, brief_obs, valid_actions, prev_df="", prev_pf="", pr
 
     # error from Parser(df, pf)
     prompt_error_parser = f"""
-        You made some mistakes when generating those files. Here is the error message: {prev_err}; {prev_err_2}
+        You made some mistakes when generating those files. Here is the error message: {prev_err_2}
         Now modify those two files according to the error message.
     """
 
@@ -689,7 +691,7 @@ def llm_to_pddl_fixed_df(model_name, brief_obs, valid_actions, prev_pf="", prev_
 
     # error from Parser(df, pf)
     prompt_error_parser = f"""
-        You made some mistakes when generating those files. Here is the error message: {prev_err}; {prev_err_2}
+        You made some mistakes when generating those files. Here is the error message: {prev_err_2}
         Now modify those two files according to the error message.
     """
 
@@ -947,17 +949,23 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                 if not df and not pf: # First step no need duplicates detection
                                     num_tries = 0
                                     df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions) # error 1 here
-                                    action, err_2 = get_action_from_pddl(df, pf) # error 2 here
+                                    action, err_2, raw_result = get_action_from_pddl(df, pf) # error 2 here
                                     with open(file_name, "a") as f:
                                         f.write(f"--Small Loop--: {num_tries} \n")
                                         f.write(f"Error: {err} \n")
                                         f.write(f"Prompt: {prompt} \n") 
                                         f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
                                         f.write(f"Actions from solver(df, pf): {action} \n")
+                                    
+                                    # if not err_2 and not action:
+                                    # if True:
+                                    #     with open(file_name, "a") as f:
+                                    #         f.write(f"Parser found no error but no actions generated, likely due to unsolvable problem. \n")
+                                    #         f.write(f"Raw result from parser: {raw_result} \n")
 
                                     while not action and num_tries < 5:
                                         df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, False, edit)
-                                        action, err_2 = get_action_from_pddl(df, pf)
+                                        action, err_2, raw_result = get_action_from_pddl(df, pf)
                                         num_tries += 1
                                         
                                         with open(file_name, "a") as f:
@@ -966,12 +974,18 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                             f.write(f"Prompt: {prompt} \n") 
                                             f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
                                             f.write(f"Actions from solver(df, pf): {action} \n")
+
+                                        # if not err_2 and not action:
+                                        # if True:
+                                        #     with open(file_name, "a") as f:
+                                        #         f.write(f"Parser found no error but no actions generated, likely due to unsolvable problem. \n")
+                                        #         f.write(f"Raw result from parser: {raw_result} \n")
                                 else:
                                     num_tries = 0
                                     # Every time read new error message from larger loop
                                     # In llm_to_pddl, detect if new large loop error message exists
                                     df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message) # need to add new error message
-                                    action, err_2 = get_action_from_pddl(df, pf)
+                                    action, err_2, raw_result = get_action_from_pddl(df, pf)
 
                                     with open(file_name, "a") as f:
                                         f.write(f"--Small Loop--: {num_tries} \n")
@@ -980,9 +994,15 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                         f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
                                         f.write(f"Actions from solver(df, pf): {action} \n")
 
+                                    # if not err_2 and not action:
+                                    # if True:
+                                    #     with open(file_name, "a") as f:
+                                    #         f.write(f"Parser found no error but no actions generated, likely due to unsolvable problem. \n")
+                                    #         f.write(f"Raw result from parser: {raw_result} \n")
+
                                     while not action and num_tries < 5:
                                         df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message)
-                                        action, err_2 = get_action_from_pddl(df, pf)
+                                        action, err_2, raw_result = get_action_from_pddl(df, pf)
                                         num_tries += 1
 
                                         with open(file_name, "a") as f:
@@ -991,6 +1011,12 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                             f.write(f"Prompt: {prompt} \n") 
                                             f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
                                             f.write(f"Actions from solver(df, pf): {action} \n")
+
+                                        # if not err_2 and not action:
+                                        # if True:
+                                        #     with open(file_name, "a") as f:
+                                        #         f.write(f"Parser found no error but no actions generated, likely due to unsolvable problem. \n")
+                                        #         f.write(f"Raw result from parser: {raw_result} \n")
 
                                 # append which loop it stops
                                 # Must be under first time generating the actions
@@ -1196,7 +1222,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
                                     if not df and not pf: # First step no need duplicates detection
                                         num_tries = 0
                                         df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, goal_type=goal_type) # error 1 here
-                                        action, err_2 = get_action_from_pddl(df, pf) # error 2 here
+                                        action, err_2, raw_result = get_action_from_pddl(df, pf) # error 2 here
                                         with open(file_name, "a") as f:
                                             f.write(f"--Small Loop--: {num_tries} \n")
                                             f.write(f"Error: {err} \n")
@@ -1206,7 +1232,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
 
                                         while not action and num_tries < 5:
                                             df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions,df, pf, err, err_2, True, False, edit, goal_type=goal_type)
-                                            action, err_2 = get_action_from_pddl(df, pf)
+                                            action, err_2, raw_result = get_action_from_pddl(df, pf)
                                             num_tries += 1
                                             
                                             with open(file_name, "a") as f:
@@ -1220,7 +1246,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
                                         # Every time read new error message from larger loop
                                         # In llm_to_pddl, detect if new large loop error message exists
                                         df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type) # need to add new error message
-                                        action, err_2 = get_action_from_pddl(df, pf)
+                                        action, err_2, raw_result = get_action_from_pddl(df, pf)
 
                                         with open(file_name, "a") as f:
                                             f.write(f"--Small Loop--: {num_tries} \n")
@@ -1231,7 +1257,7 @@ def run_iterative_model_50(model_name, folder_name="3_0421_CC", result_name="CC_
 
                                         while not action and num_tries < 5:
                                             df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type)
-                                            action, err_2 = get_action_from_pddl(df, pf)
+                                            action, err_2, raw_result = get_action_from_pddl(df, pf)
                                             num_tries += 1
 
                                             with open(file_name, "a") as f:
@@ -1452,7 +1478,7 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
                                         if not pf: # First step no need duplicates detection
                                             num_tries = 0
                                             pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, valid_actions, goal_type=goal_type, df=df) # error 1 here
-                                            action, err_2 = get_action_from_pddl(df, pf) # error 2 here
+                                            action, err_2, raw_result = get_action_from_pddl(df, pf) # error 2 here
                                             with open(file_name, "a") as f:
                                                 f.write(f"--Small Loop--: {num_tries} \n")
                                                 f.write(f"Error: {err} \n")
@@ -1462,7 +1488,7 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
 
                                             while not action and num_tries < 5:
                                                 pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, False, edit, goal_type=goal_type, df=df)
-                                                action, err_2 = get_action_from_pddl(df, pf)
+                                                action, err_2, raw_result = get_action_from_pddl(df, pf)
                                                 num_tries += 1
                                                 
                                                 with open(file_name, "a") as f:
@@ -1476,7 +1502,7 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
                                             # Every time read new error message from larger loop
                                             # In llm_to_pddl, detect if new large loop error message exists
                                             pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, valid_actions, df, pf, err, None, False, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type, df=df) # need to add new error message
-                                            action, err_2 = get_action_from_pddl(df, pf)
+                                            action, err_2, raw_result = get_action_from_pddl(df, pf)
 
                                             with open(file_name, "a") as f:
                                                 f.write(f"--Small Loop--: {num_tries} \n")
@@ -1487,7 +1513,7 @@ def run_iterative_model_fixed_df(model_name, folder_name="3_0421_CC", result_nam
 
                                             while not action and num_tries < 5:
                                                 pf, err, prompt = llm_to_pddl_fixed_df(model_name, brief_obs, valid_actions, df, pf, err, err_2, True, detect_duplicates(all_actions, 3), edit, overall_memory, large_loop_error_message, goal_type=goal_type, df=df)
-                                                action, err_2 = get_action_from_pddl(df, pf)
+                                                action, err_2, raw_result = get_action_from_pddl(df, pf)
                                                 num_tries += 1
 
                                                 with open(file_name, "a") as f:
@@ -2122,7 +2148,7 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
                         num_tries = 0
                         # Fix the current pending PF using llm_to_pddl.
                         df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, prev_df=df, prev_pf=pending_pf, overall_memory=overall_memory, large_loop_error_message=large_loop_error_message)
-                        action, err_2 = get_action_from_pddl(df, pf)
+                        action, err_2, raw_result = get_action_from_pddl(df, pf)
                         with open(file_name, "a") as f:
                             f.write(f"--Small Loop--: {num_tries}\n")
                             f.write(f"Error: {err} & {err_2}\n")
@@ -2131,7 +2157,7 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
                             f.write(f"Actions from solver(df, pf): {action}\n")
                         while not action and num_tries < 5:
                             df, pf, err, prompt = llm_to_pddl(model_name, brief_obs, prev_df=df, prev_pf=pending_pf, prev_err=err, prev_err_2=err_2, have_error=True, overall_memory=overall_memory, large_loop_error_message=large_loop_error_message)
-                            action, err_2 = get_action_from_pddl(df, pf)
+                            action, err_2, raw_result = get_action_from_pddl(df, pf)
                             num_tries += 1
                             with open(file_name, "a") as f:
                                 f.write(f"--Small Loop--: {num_tries}\n")
@@ -2210,11 +2236,15 @@ def run_merging_pf_model(model_name="deepseek-ai/DeepSeek-R1-Distill-Llama-70B",
 i = 0
 num_trials = 2
 # folder_name = "CC_o4_mini_high"
-folder_name = "yewon_coin_0819_sanity_check"
+folder_name = "yewon_coin_0826_networkPlanner_other_open" # 이젠 로그 다 해봐
 result_name = folder_name
 model_id1 = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
 model_id2 = "Qwen/Qwen3-32B"
-model_id3 = "meta-llama/Llama-3.3-70B-Instruct"
+model_id3 = "meta-llama/Llama-3.1-8B-Instruct"
+model_id4 = "meta-llama/Llama-3.1-70B-Instruct"
+model_id5 = "meta-llama/Llama-3.3-70B-Instruct"
+model_id6 = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+
 ## Run PlanGen models
 # run_baseline_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name)
 # clear_cuda_memory(model_id1)
@@ -2235,8 +2265,18 @@ model_id3 = "meta-llama/Llama-3.3-70B-Instruct"
 
 
 ## Run PDDLego+ models
-# run_iterative_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# clear_cuda_memory(model_id1)
+run_iterative_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+clear_cuda_memory(model_id1)
+run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+clear_cuda_memory(model_id2)
+run_iterative_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+clear_cuda_memory(model_id3)
+run_iterative_model(model_id4, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+clear_cuda_memory(model_id4)
+run_iterative_model(model_id5, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+clear_cuda_memory(model_id5)
+run_iterative_model(model_id6, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+clear_cuda_memory(model_id6)
 # run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # clear_cuda_memory(model_id2)
@@ -2246,7 +2286,7 @@ model_id3 = "meta-llama/Llama-3.3-70B-Instruct"
 # run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
 # run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("gpt-4.1-2025-04-14", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # run_iterative_model("deepseek", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
 # run_iterative_model_50("o4-mini-2025-04-16", folder_name=folder_name, result_name=result_name, goal_type="detailed")
