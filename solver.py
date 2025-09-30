@@ -1,4 +1,4 @@
-import tempfile, shutil, signal, textwrap
+import tempfile, shutil, signal
 from pathlib import Path
 import subprocess
 import os
@@ -77,29 +77,10 @@ def run_solver(domain_file: str,
             if plan_path.exists() and plan_path.stat().st_size:
                 plan_text = plan_path.read_text(encoding="utf-8")
 
-            val_log = ""
-            if validate_with_val and plan_text:
-                # Write plan to a file for VAL and run it.
-                val_plan_path.write_text(plan_text, encoding="utf-8")
-                val_cmd = ["planutils", "run", "val", "Validate",
-                           str(dom_path), str(prob_path), str(val_plan_path)]
-                val_proc = subprocess.run(val_cmd, capture_output=True, text=True, cwd=str(tmp))
-                val_log = (val_proc.stdout or "") + (val_proc.stderr or "")
-                # Optional: if VAL says invalid, treat as failure by clearing plan_text.
-                if "Plan valid" not in val_log:
-                    # Keep the plan text (for debugging) but you can force a retry by uncommenting:
-                    # plan_text = ""
-                    pass
-
             # Build a result shaped like the remote service.
             result = {
                 "output": {"plan": plan_text},
-                "stderr": textwrap.dedent(f"""\
-                    ── SOLVER LOG ─────────────────────────────────
-                    {solver_log.strip()}
-                    ── VAL LOG ────────────────────────────────────
-                    {val_log.strip() if val_log.strip() else "No validation log."}
-                """)
+                "stderr": solver_log.strip()
             }
             return result
 

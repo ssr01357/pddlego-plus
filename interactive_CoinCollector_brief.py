@@ -22,22 +22,20 @@ from textworld_express import TextWorldExpressEnv
 
 from openai import OpenAI
 from utils import repair_json
-from prompts_CoinCollector import *
+from prompts_CoinCollector_gemini import *
 from solver import run_solver
 
 _hf_engine_cache: dict[str, HuggingEngine] = {}
 
 OPENAI_MODELS_LIST = ['gpt-4o','o3-mini',"gpt-4.1","o4-mini", "gpt-5-nano-2025-08-07"]
 ENV_PARAMS = {"gameName": "coin", "gameParams": "numLocations=11,numDistractorItems=0,includeDoors=1,limitInventorySize=0"}
+MAX_STEPS = 20
 
-
-def _tail(s, n=4000):
-    return s if not s or len(s) <= n else s[-n:]
-
+# close door to
 # can be moved to utils.py
 def _sanitize_valid_actions(infos):
-    vals = sorted(infos.get("validActions", []))
-    return [v for v in vals if v not in ("look around", "inventory")]
+    vals = sorted(infos['validActions'])
+    return [v for v in vals if v not in ("look around", "inventory") and not v.startswith("close door to")]
 
 def clear_cuda_memory(model_name):
     global _hf_engine_cache
@@ -146,32 +144,6 @@ def map_actions(action):
         return None
     return action_lst
 
-# def map_actions(plan_text):
-#     lines = [l.strip().lower() for l in plan_text.splitlines() if l.strip()]
-#     action_lst = []
-#     dirs = {"north","south","east","west","n","s","e","w"}
-#     def norm(d):
-#         return {"n":"north","s":"south","e":"east","w":"west"}.get(d,d)
-
-#     for l in lines:
-#         # strip parens and split
-#         toks = re.findall(r"[a-z0-9_-]+", l)
-#         if not toks: 
-#             continue
-#         name = toks[0]
-#         # prefer the enforced names
-#         if name in ("open-door", "open_door", "open"):
-#             # pick last token that looks like a direction
-#             dir_tok = next((norm(t) for t in reversed(toks) if t in dirs), None)
-#             if dir_tok:
-#                 action_lst.append(f"open door to {dir_tok}")
-#         elif name in ("move","go","walk"):
-#             dir_tok = next((norm(t) for t in reversed(toks) if t in dirs), None)
-#             if dir_tok:
-#                 action_lst.append(f"move {dir_tok}")
-#     return action_lst or None
-
-
 def map_env_feedback_to_large_loop_error(brief_obs: str, taken_action: str):
     """
     Map environment feedback in `brief_obs` (and the `taken_action`) to a
@@ -264,9 +236,6 @@ def llm_to_pddl(model_name, brief_obs, valid_actions, prev_df="", prev_pf="", pr
 
         prompt += "\nNow rewrite both the domain and problem files with the minimal fix.\n"
 
-
-
-    # df, pf = run_llm(prompt, model_name)
     resp = run_llm_json(prompt, model_name, system_prompt=SYS_PROMPT_PDDL)
     df = resp.get("df", None)
     pf = resp.get("pf", None)
@@ -287,8 +256,12 @@ def llm_to_actions_baseline(model_name, brief_obs, valid_actions, overall_memory
 
 # Main functions here:
 def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
-   
-    for trial in range(start_trial, end_trial): 
+
+    # for trial in range(start_trial, end_trial): 
+    adjusted_end = end_trial
+    trial = start_trial
+    while trial < adjusted_end:
+        start_time = time.time()
         retry = 0
         while retry < 2: 
             try:
@@ -311,21 +284,26 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                 
                 env = TextWorldExpressEnv(envStepLimit=100)
                 env.load(**ENV_PARAMS)
-                obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+                obs, infos = env.reset(seed=trial, gameFold="train", generateGoldPath=True)
                 valid_actions = _sanitize_valid_actions(infos)
+                # if "coin" in obs.lower():
+                #     print("Coin found at the beginning!")
+                #     coin_found = True
+                #     exit(0)
+
+                # If coin is visible in the very first observation, skip this seed and
+                # extend the window so we still complete the requested number of meaningful trials.
                 if "coin" in obs.lower():
-                    print("Coin found at the beginning!")
-                    coin_found = True
-                    exit(0)
+                    print(f"[Seed {trial}] Coin found at the beginning — skipping this seed and extending the trial window.")
+                    adjusted_end += 1
+                    break  # break out of the retry loop; we'll advance to the next seed below
+ 
                 with open(file_name, "a") as f:  # "w" creates a new file or overwrites an existing file
                     f.write(f"Observations: {obs} \n") 
                     f.write(f"Gold path: {env.getGoldActionSequence()} \n")
                     f.write(f"Valid Actions: {valid_actions} \n")
                     f.write(f"taskDescription: {infos['taskDescription']} \n")
-    
-              
 
-                MAX_STEPS = 20
 
                 brief_obs = "Action: look around\n" + summarize_obs(obs)+'\n' # initial definition
                 with open(file_name, "a") as f:
@@ -342,7 +320,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
 
                 overall_memory = brief_obs
 
-                for step_id in range(0, MAX_STEPS):
+                for step_id in range(MAX_STEPS):
                     with open(file_name, "a") as f:
                         f.write(f"\n\n====Step {step_id}==== \n")
 
@@ -363,10 +341,10 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                             # reset env by refilling successful actions (stupid but useful)<- 왜 이렇게 하지?
                             env = TextWorldExpressEnv(envStepLimit=100)
                             env.load(**ENV_PARAMS)
-                            obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True) # 여기서 나온 obs, infos는 쓰지도 않음
+                            obs, infos = env.reset(seed=trial, gameFold="train", generateGoldPath=True) # 여기서 나온 obs, infos는 쓰지도 않음
                             for successful_action in successful_actions: # 초기화 다음, 어떤 행동을 취하기 시작한 후부터의 아웃풋에 주목
                                 obs, reward, done, infos = env.step(successful_action) # <-아... 앞단계에서 검증된거 한꺼번에 넣어주고 다음 action찾으려고
-                            valid_actions = _sanitize_valid_actions(infos)
+                            valid_actions = _sanitize_valid_actions(infos) # 이거 오리지널스크립트에서는 업데이트 안함.이유를 알았음. 어차피 안변함 -> no, 틀렸음. 바뀌네. 
 
                         action_queue = [] # reset action_queue ()
                         tem_action_queue = []
@@ -450,11 +428,13 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                             taken_action = action_queue.pop(0)
 
                             obs, reward, done, infos = env.step(taken_action)
+                            valid_actions = _sanitize_valid_actions(infos)
 
                             # Directly end the game if found coin
                             if "coin" in obs:
                                 taken_action = "take coin"
                                 obs, reward, done, infos = env.step(taken_action)
+                                valid_actions = _sanitize_valid_actions(infos)
                                 end_game = True
                                 with open(file_name, "a") as f:
                                     f.write('Coin found!\n')
@@ -471,13 +451,10 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                             with open(file_name, "a") as f:
                                 f.write(f"> {taken_action} \n {obs} \n")
 
-                            msg, _code = map_env_feedback_to_large_loop_error(brief_obs, taken_action)
+                            large_loop_error_message, _code = map_env_feedback_to_large_loop_error(brief_obs, taken_action)
                             # If you want to go one step further later, you can use the returned _code
-                            if msg:
-                                large_loop_error_message = msg
-                                # large_loop_error_message = obs
-                                with open(file_name, "a") as f:
-                                    f.write(f"Large loop error message: {large_loop_error_message} \n")
+                            if _code == "env_error":
+                                action_passed = False
                                 break
 
                             # append into overall memory and dictionary format
@@ -497,11 +474,11 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
 
                     if end_game:
                         break
-                
+                duration = time.time() - start_time
                 with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
                     # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
                     model_type = "PDDL"
-                    data_row = [today, model_name, model_type, goal_type, trial, coin_found, len(trial_record)-1,trial_record[-1][-1], trial_record]
+                    data_row = [today, model_name, model_type, goal_type, trial, coin_found, duration, len(trial_record)-1,trial_record[-1][-1], trial_record]
                     # [today, model_name, trial, coin_found, len(trial_record)-1,trial_record[-1][-1], trial_record]
                     writer = csv.writer(csvfile)
                     writer.writerow(data_row)
@@ -517,11 +494,284 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                     )
                     f.write(log_message)
                 retry += 1
+        trial += 1
+
+# =========================
+
+def run_iterative_model2(model_name, start_trial = 0, end_trial = 11, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
+   
+    # for trial in range(start_trial, end_trial):
+    adjusted_end = end_trial
+    trial = start_trial
+    while trial < adjusted_end:
+        start_time = time.time() 
+        retry = 0
+        while retry < 2: 
+            try:
+                coin_found = False
+                today = date.today()
+
+                fixed_model_name = model_name.replace("/","_")
+
+                folder_path = f"output/{folder_name}"
+                if not os.path.exists(folder_path):
+                    os.makedirs(folder_path)
+
+                file_name = f"{folder_path}/{today}_{fixed_model_name}_PDDL_Multi_Step_{goal_type}_{trial}.txt"
+                
+                if os.path.exists(file_name): # retry == 1 and 
+                    open(file_name, 'w').close()  # empty file
+                    print(f"[Trial {trial}] Retrying: cleared file and retrying...")
+
+                trial_record = []
+                
+                env = TextWorldExpressEnv(envStepLimit=100)
+                env.load(**ENV_PARAMS)
+                obs, infos = env.reset(seed=trial, gameFold="train", generateGoldPath=True)
+                valid_actions = _sanitize_valid_actions(infos)
+                # if "coin" in obs.lower():
+                #     print("Coin found at the beginning!")
+                #     coin_found = True
+                #     exit(0)
+                # If coin is visible in the very first observation, skip this seed and
+                # extend the window so we still complete the requested number of meaningful trials.
+                if "coin" in obs.lower():
+                    print(f"[Seed {trial}] Coin found at the beginning — skipping this seed and extending the trial window.")
+                    adjusted_end += 1
+                    break  # break out of the retry loop; we'll advance to the next seed below
+                with open(file_name, "a") as f:  # "w" creates a new file or overwrites an existing file
+                    f.write(f"Observations: {obs} \n") 
+                    f.write(f"Gold path: {env.getGoldActionSequence()} \n")
+                    f.write(f"Valid Actions: {valid_actions} \n")
+                    f.write(f"taskDescription: {infos['taskDescription']} \n")
 
 
+                brief_obs = "Action: look around\n" + summarize_obs(obs)+'\n' # initial definition
+                with open(file_name, "a") as f:
+                    f.write(f"brief_obs: {brief_obs} \n") 
+                # print(brief_obs)
+
+                action_queue = []
+                obs_queue = []
+                df = ""
+                pf = ""
+                all_actions = []
+                successful_actions = []
+                end_game = False
+
+                overall_memory = brief_obs
+
+                for step_id in range(MAX_STEPS):
+                    with open(file_name, "a") as f:
+                        f.write(f"\n\n====Step {step_id}==== \n")
+
+                    trial_step_record = []
+                    within_step_tries = 0
+                    action_passed = False
+                    large_loop_error_message = ""
+
+                    # Under step#, it should repeat until run all actions and found no error
+                    while within_step_tries < 5 and not action_passed:
+                        with open(file_name, "a") as f:
+                            f.write(f'\n----Larger Loop No. {within_step_tries}---- \n') 
+                            f.write(f'successful_actions: {successful_actions} \n')
+
+                        within_step_tries += 1
+
+                        if within_step_tries > 1: # second or third ... time in the larger loop
+                            env = TextWorldExpressEnv(envStepLimit=100)
+                            env.load(**ENV_PARAMS)
+                            obs, infos = env.reset(seed=trial, gameFold="train", generateGoldPath=True) # 여기서 나온 obs, infos는 쓰지도 않음
+                            for successful_action in successful_actions: # 초기화 다음, 어떤 행동을 취하기 시작한 후부터의 아웃풋에 주목
+                                obs, reward, done, infos = env.step(successful_action) # <-아... 앞단계에서 검증된거 한꺼번에 넣어주고 다음 action찾으려고
+                            valid_actions = _sanitize_valid_actions(infos) # 이거 오리지널스크립트에서는 업데이트 안함.이유를 알았음. 어차피 안변함
+
+                        action_queue = [] # reset action_queue ()
+                        tem_action_queue = []
+                        tem_memory = ""
+
+                        start_checkpoint = True
+                        while start_checkpoint or action_queue:
+                            with open(file_name, "a") as f:
+                                f.write(f'Small Loop, action_queue: {action_queue} \n')
+                            start_checkpoint = False
+
+                            if not action_queue: # when start_checkpoint = True before. 이 시점에는 무조건 false긴 하지만 그래도 이 while문 들어올 때
+                                if obs_queue:
+                                    brief_obs = "\n".join(obs_queue)
+                                    obs_queue = []
+                                action = ""
+                                
+                                if not df and not pf: # First step no need duplicates detection
+                                    num_tries = 0
+
+                                    first_generation_tries = 0
+
+                                    while ((not df) or (not pf)) and first_generation_tries < 3: # if one of them is empty, regenerate both
+                                        prompt_df = prompt_format_df.format() + prompt_df_generation.format(brief_obs=brief_obs, valid_actions=valid_actions)
+                                        resp1 = run_llm_json(prompt_df, model_name, system_prompt=SYS_PROMPT_PDDL)
+                                        df = resp1.get("df", None)
+                                        # print(f"First generation try {first_generation_tries}, raw response: {resp1}, df: {df}")
+
+                                        prompt_pf_init = prompt_format_pf_init.format() + prompt_pf_init_generation.format(brief_obs=brief_obs, valid_actions=valid_actions, df=df)
+                                        resp2 = run_llm_json(prompt_pf_init, model_name, system_prompt=SYS_PROMPT_PDDL)
+                                        pf_init = resp2.get("pf_objects_and_init", None)
+                                        # print(f"First generation try {first_generation_tries}, raw response: {resp2}, pf_init: {pf_init}")
+
+                                        prompt_pf_complete = prompt_format_pf_complete.format() + prompt_pf_complete_generation.format(brief_obs=brief_obs, valid_actions=valid_actions, df=df, pf_init=pf_init)
+                                        resp3 = run_llm_json(prompt_pf_complete, model_name, system_prompt=SYS_PROMPT_PDDL)
+                                        pf = resp3.get("pf", None)
+                                        # print(f"First generation try {first_generation_tries}, raw response: {resp3}, pf: {pf}")
+
+                                        with open(file_name, "a") as f:
+                                            f.write(f"--First Generation Try--: {first_generation_tries} \n")
+                                            f.write(f"Prompt DF: {prompt_df} \n") 
+                                            f.write(f"Generated df: \n {df} \n") 
+                                            f.write(f"Prompt PF init: {prompt_pf_init} \n") 
+                                            f.write(f"Generated pf_init: \n {pf_init} \n") 
+                                            f.write(f"Prompt PF complete: {prompt_pf_complete} \n") 
+                                            f.write(f"Generated pf_complete: \n {pf} \n")
+
+                                        first_generation_tries += 1   
+
+                                    action, err, plan_text = get_action_from_pddl(df, pf) # error 2 here
+
+                                    with open(file_name, "a") as f:
+                                        f.write(f"--Small Loop--: {num_tries} \n")
+                                        f.write(f"Actions from solver(df, pf): {action} \n")
+                                        f.write(f"Raw plan text: {plan_text} \n")
+
+                                    while not action and num_tries < 5:
+                                        df, pf, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, False)
+                                        action, err, plan_text = get_action_from_pddl(df, pf)
+                                        num_tries += 1
+                                        
+                                        with open(file_name, "a") as f:
+                                            f.write(f"--Small Loop--: {num_tries} \n")
+                                            f.write(f"Prompt: {prompt} \n") 
+                                            f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
+                                            f.write(f"Actions from solver(df, pf): {action} \n")
+                                            f.write(f"Raw plan text: {plan_text} \n")
+                                else:
+                                    num_tries = 0
+                                    # Every time read new error message from larger loop
+                                    # In llm_to_pddl, detect if new large loop error message exists
+                                    df, pf, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, "", detect_duplicates(all_actions, 3), overall_memory, large_loop_error_message) # need to add new error message
+                                    action, err, plan_text = get_action_from_pddl(df, pf)
+
+                                    with open(file_name, "a") as f:
+                                        f.write(f"--Small Loop--: {num_tries} \n")
+                                        f.write(f"Prompt: {prompt} \n") 
+                                        f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
+                                        f.write(f"Actions from solver(df, pf): {action} \n")
+                                        f.write(f"Raw plan text: {plan_text} \n")
+
+                                    while not action and num_tries < 5:
+                                        df, pf, prompt = llm_to_pddl(model_name, brief_obs, valid_actions, df, pf, err, detect_duplicates(all_actions, 3), overall_memory, large_loop_error_message)
+                                        action, err, plan_text = get_action_from_pddl(df, pf)
+                                        num_tries += 1
+
+                                        with open(file_name, "a") as f:
+                                            f.write(f"--Small Loop--: {num_tries} \n")
+                                            f.write(f"Prompt: {prompt} \n") 
+                                            f.write(f"Generated df and pf: \n {df} \n {pf} \n") 
+                                            f.write(f"Actions from solver(df, pf): {action} \n")
+                                            f.write(f"Raw plan text: {plan_text} \n")
+
+                                # append which loop it stops
+                                # Must be under first time generating the actions
+                                trial_step_record.append([within_step_tries, num_tries])
+
+                                if action:
+                                    action_queue.extend(action)
+                                    tem_action_queue.extend(action) # temporary action queue to put in successful_actions
+                                    all_actions.extend(action) # to detect duplicated
+                                else:
+                                    end_game = True
+                                    break
+
+                            with open(file_name, "a") as f:
+                                f.write(f"Current action_queue: {action_queue} \n")
+                            
+                            taken_action = action_queue.pop(0)
+
+                            obs, reward, done, infos = env.step(taken_action)
+                            valid_actions = _sanitize_valid_actions(infos)
+
+                            # Directly end the game if found coin
+                            if "coin" in obs:
+                                taken_action = "take coin"
+                                obs, reward, done, infos = env.step(taken_action)
+                                valid_actions = _sanitize_valid_actions(infos)
+                                end_game = True
+                                with open(file_name, "a") as f:
+                                    f.write('Coin found!\n')
+                                    f.write(f"Final obs: {obs} \n")
+                                    coin_found = True
+                                break
+                            
+                            action_text = "Action: " + taken_action + "\n"
+                            obs_text = summarize_obs(obs) + "\n"
+
+                            brief_obs = action_text + obs_text
+
+                            obs_queue.append(brief_obs)
+                            with open(file_name, "a") as f:
+                                f.write(f"> {taken_action} \n {obs} \n")
+
+                            large_loop_error_message, _code = map_env_feedback_to_large_loop_error(brief_obs, taken_action)
+                            # If you want to go one step further later, you can use the returned _code
+                            if _code == "env_error":
+                                action_passed = False
+                                break
+
+                            # append into overall memory and dictionary format
+                            tem_memory += brief_obs
+
+                            # It should be the last step and passed all actions
+                            if not action_queue:
+                                action_passed = True
+                                successful_actions.extend(tem_action_queue)
+                                overall_memory += tem_memory
+
+                        if (within_step_tries == 5 and not action_passed) or end_game:
+                            end_game = True
+                            break
+
+                    trial_record.append(trial_step_record)
+
+                    if end_game:
+                        break
+                duration = time.time() - start_time
+                with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
+                    # date, model_name, trial, failed at step #, [large loop, small loop], detailed loop info
+                    model_type = "PDDL_Multi_Step"
+                    data_row = [today, model_name, model_type, goal_type, trial, coin_found, duration, len(trial_record)-1,trial_record[-1][-1], trial_record]
+                    # [today, model_name, trial, coin_found, len(trial_record)-1,trial_record[-1][-1], trial_record]
+                    writer = csv.writer(csvfile)
+                    writer.writerow(data_row)
+                break
+
+            except Exception as e:
+                error_log_path = f"output/{folder_name}/errors.txt"
+                with open(error_log_path, "a") as f:
+                    log_message = (
+                        f"[PDDL_Multi_Step] Trial {trial} (Attempt {retry+1}) | "
+                        f"Model: {model_name} | Goal Type: {goal_type} | "
+                        f"Failed: {str(e)}\n"
+                    )
+                    f.write(log_message)
+                retry += 1
+        trial += 1        
+
+# =========================
 
 def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031825_alfworld", result_name="alfworld_results"):
-    for trial in range(start_trials, end_trials):
+    # for trial in range(start_trials, end_trials):
+    adjusted_end = end_trials
+    trial = start_trials
+    while trial < adjusted_end:
+        start_time = time.time()
         retry = 0
         while retry < 2:  # allow up to 2 attempts per trial
             try:
@@ -544,19 +794,24 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
                 env = TextWorldExpressEnv(envStepLimit=100)
 
                 env.load(**ENV_PARAMS)
-                obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+                obs, infos = env.reset(seed=trial, gameFold="train", generateGoldPath=True)
                 valid_actions = _sanitize_valid_actions(infos)
+                # if "coin" in obs.lower():
+                #     print("Coin found at the beginning!")
+                #     coin_found = True
+                #     exit(0)
+                # If coin is visible in the very first observation, skip this seed and
+                # extend the window so we still complete the requested number of meaningful trials.
                 if "coin" in obs.lower():
-                    print("Coin found at the beginning!")
-                    coin_found = True
-                    exit(0)
+                    print(f"[Seed {trial}] Coin found at the beginning — skipping this seed and extending the trial window.")
+                    adjusted_end += 1
+                    break  # break out of the retry loop; we'll advance to the next seed below
                 with open(file_name, "a") as f:
                     f.write(f"Observations: {obs} \n")
                     f.write(f"Gold path: {env.getGoldActionSequence()} \n")
                     f.write(f"Valid Actions: {valid_actions} \n")
                     f.write(f"taskDescription: {infos['taskDescription']} \n")
 
-                MAX_STEPS = 20
                 brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
                 with open(file_name, "a") as f:
                     f.write(f"brief_obs: {brief_obs} \n")
@@ -587,7 +842,7 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
                         if within_step_tries > 1:  # For subsequent tries, reset the environment
                             env = TextWorldExpressEnv(envStepLimit=100)
                             env.load(**ENV_PARAMS)
-                            obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
+                            obs, infos = env.reset(seed=trial, gameFold="train", generateGoldPath=True)
                             for act in successful_actions:
                                 obs, reward, done, infos = env.step(act)
                             valid_actions = _sanitize_valid_actions(infos)
@@ -624,11 +879,13 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
                                 f.write(f"Current action_queue: {action_queue} \n")
                             taken_action = action_queue.pop(0)
                             obs, reward, done, infos = env.step(taken_action)
+                            valid_actions = _sanitize_valid_actions(infos)
 
                             # Immediately end the game if coin is found.
                             if "coin" in obs:
                                 taken_action = "take coin"
                                 obs, reward, done, infos = env.step(taken_action)
+                                valid_actions = _sanitize_valid_actions(infos)
                                 end_game = True
                                 with open(file_name, "a") as f:
                                     f.write("Coin found!\n")
@@ -670,12 +927,13 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
                     if end_game:
                         break
 
+                duration = time.time() - start_time
                 with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
                     # Write out: date, model_name, trial, coin_found, last step index, last large-loop iteration, and the full trial record.
                     # data_row = [today, model_name, trial, coin_found, len(trial_record)-1, trial_record[-1] if trial_record else None, trial_record]
                     model_type = 'baseline' # PDDL
                     goal_type = 'detailed' # detailed or subgoal
-                    data_row = [today, model_name, model_type, goal_type, trial, coin_found, len(trial_record)-1,trial_record[-1][-1], trial_record]
+                    data_row = [today, model_name, model_type, goal_type, trial, coin_found, duration, len(trial_record)-1,trial_record[-1][-1], trial_record]
 
                     writer = csv.writer(csvfile)
                     writer.writerow(data_row)
@@ -691,303 +949,42 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
                     )
                     f.write(log_message)
                 retry += 1
+        trial += 1
 
-
-
-def llm_to_pyir(model_name, brief_obs, valid_actions, history = None):
-    prompt = prompt_pyir.format(pypddl_instruction=pypddl_instruction, brief_obs=brief_obs, valid_actions=valid_actions)
-
-    if history:
-        prompt += f"""
-        ### Previous IR and PDDL history:
-        {history}
-        ### End of history.
-
-        Now, based on the above history and your current observation, update the Python representation of PDDL files. 
-        """
-
-    resp = run_llm_json(prompt, model_name, system_prompt=SYS_PROMPT_PYIR)
-    py_domain = resp.get("py_domain", "")
-    py_problem = resp.get("py_problem", "")
-    return py_domain, py_problem, prompt
-
-
-
-
-def llm_pyir_to_pddl(model_name, py_domain, py_problem, brief_obs, valid_actions,
-                     prev_df="", prev_pf="", prev_err="", large_loop_error_message=""):
-
-    prev_pddl = ""
-    if prev_df and prev_pf:
-        prev_pddl = f"[Domain file]\n{prev_df}\n\n[Problem file]\n{prev_pf}"
-
-    prompt = prompt_pyir2pddl.format(
-        py_domain=py_domain,
-        py_problem=py_problem,
-        brief_obs=brief_obs,
-        valid_actions=valid_actions,
-        prev_pddl=prev_pddl or "N/A",
-        prev_err=prev_err or "N/A",
-        env_err=large_loop_error_message or "N/A"
-    )
-
-    resp = run_llm_json(prompt, model_name, system_prompt=SYS_PROMPT_PDDL)
-    df = resp.get("df", None)
-    pf = resp.get("pf", None)
-    return df, pf, prompt
 
 # =========================
-# [3] Python IR → PDDL: runner
-# =========================
-
-def run_pyir_model(model_name, start_trial=0, end_trial=11, folder_name="3_0421_CC", result_name="CC_results", goal_type="detailed"):
-    for trial in range(start_trial, end_trial):
-        retry = 0
-        while retry < 2:
-            try:
-                coin_found = False
-                today = date.today()
-                fixed_model_name = model_name.replace("/", "_")
-
-                folder_path = f"output/{folder_name}"
-                if not os.path.exists(folder_path):
-                    os.makedirs(folder_path)
-
-                file_name = f"{folder_path}/{today}_{fixed_model_name}_PyIR_{goal_type}_{trial}.txt"
-                if os.path.exists(file_name):
-                    open(file_name, 'w').close()
-                    print(f"[Trial {trial}] Retrying: cleared file and retrying...")
-
-                trial_record = []
-
-                env = TextWorldExpressEnv(envStepLimit=100)
-                env.load(**ENV_PARAMS)
-                obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-                valid_actions = _sanitize_valid_actions(infos)
-                if "coin" in obs.lower():
-                    print("Coin found at the beginning!")
-                    coin_found = True
-                    exit(0)
-                with open(file_name, "a") as f:
-                    f.write(f"Observations: {obs} \n")
-                    f.write(f"Gold path: {env.getGoldActionSequence()} \n")
-                    f.write(f"Valid Actions: {valid_actions} \n")
-                    f.write(f"taskDescription: {infos['taskDescription']} \n")
 
 
-                MAX_STEPS = 20
-                brief_obs = "Action: look around\n" + summarize_obs(obs) + "\n"
-                with open(file_name, "a") as f:
-                    f.write(f"brief_obs: {brief_obs} \n")
-
-                action_queue = []
-                obs_queue = []
-                df = ""
-                pf = ""
-                py_domain = ""
-                py_problem = ""
-                all_actions = []
-                successful_actions = []
-                end_game = False
-                overall_memory = brief_obs
-
-                for step_id in range(0, MAX_STEPS):
-                    with open(file_name, "a") as f:
-                        f.write(f"\n\n====Step {step_id}==== \n")
-
-                    trial_step_record = []
-                    within_step_tries = 0
-                    action_passed = False
-                    large_loop_error_message = ""
-
-                    while within_step_tries < 5 and not action_passed:
-                        with open(file_name, "a") as f:
-                            f.write(f"\n----Larger Loop No. {within_step_tries}---- \n")
-                            f.write(f"successful_actions: {successful_actions} \n")
-
-                        within_step_tries += 1
-
-                        if within_step_tries > 1:
-                            env = TextWorldExpressEnv(envStepLimit=100)
-                            env.load(**ENV_PARAMS)
-                            obs, infos = env.reset(seed=1, gameFold="train", generateGoldPath=True)
-                            for act in successful_actions:
-                                obs, reward, done, infos = env.step(act)
-                            valid_actions = _sanitize_valid_actions(infos)
-
-                        action_queue = []
-                        tem_action_queue = []
-                        tem_memory = ""
-
-                        start_checkpoint = True
-                        while start_checkpoint or action_queue:
-                            with open(file_name, "a") as f:
-                                f.write(f"Small Loop, action_queue: {action_queue} \n")
-                            start_checkpoint = False
-
-                            if not action_queue: # when start_checkpoint = True
-                                if obs_queue:
-                                    brief_obs = "\n".join(obs_queue)
-                                    obs_queue = []
-                                
-                                action = None
-                                num_tries = 0
-                                pddl_err = "" # To store the planner's stderr
-
-                                while not action and num_tries < 5:
-                                    # 1. generate or refresh Python IR
-                                    # refresh it on the first try, or if PDDL generation fails multiple times (tries 3 and 5).
-                                    if num_tries in [0, 2, 4]:
-                                        history_blob = ""
-                                        if py_domain or py_problem or df or pf:
-                                            history_blob = (
-                                                "### Previous Python IR (edit minimally if possible)\n"
-                                                f"[py_domain]\n{py_domain}\n\n[py_problem]\n{py_problem}\n\n"
-                                                "### Previous PDDL (generated from the IR)\n"
-                                                f"[df]\n{df}\n\n[pf]\n{pf}\n"
-                                                "### Planner Error from previous PDDL (if any)\n"
-                                                f"{pddl_err or 'N/A'}\n"
-                                                "### Environment feedback from previous action (if any)\n"
-                                                f"{large_loop_error_message or 'N/A'}\n"
-                                            )
-       
-                                        py_domain, py_problem, pyir_prompt = llm_to_pyir(
-                                            model_name, brief_obs, valid_actions, history=history_blob
-                                        )
-                                        with open(file_name, "a") as f:
-                                            f.write(f"[PyIR Prompt] {pyir_prompt}\n")
-                                            f.write(f"Generated py_domain:\n{py_domain}\n")
-                                            f.write(f"Generated py_problem:\n{py_problem}\n")
-
-                                    # 2. convert the latest Python IR to PDDL
-                                    df, pf, conv_prompt = llm_pyir_to_pddl(model_name, py_domain, py_problem, brief_obs, valid_actions,
-                                                                             prev_df=df, prev_pf=pf, prev_err=pddl_err, large_loop_error_message=large_loop_error_message
-                                                                             )
-                                    # 3. get actions from the PDDL files
-                                    action, pddl_err, plan_text = get_action_from_pddl(df, pf)
-                                    with open(file_name, "a") as f:
-                                        f.write(f"\n--- Attempting to Plan (Small Loop Try #{num_tries + 1}) ---\n")
-                                        f.write(f"[IR→PDDL Prompt] {conv_prompt} \n")
-                                        f.write(f"[PDDL df]\n{df}\n\n[PDDL pf]\n{pf}\n")
-                                        f.write(f"Actions from solver: {action} \n")
-                                        f.write(f"Raw plan text: {plan_text} \n")
-                                        if pddl_err:
-                                            f.write(f"Solver stderr:\n{pddl_err}\n")
-                                    num_tries += 1
-                            
-
-                                trial_step_record.append([within_step_tries, num_tries])
-
-                                if action:
-                                    action_queue.extend(action)
-                                    tem_action_queue.extend(action)
-                                    all_actions.extend(action)
-                                else:
-                                    end_game = True
-                                    break
-
-                            # Execute one action
-                            with open(file_name, "a") as f:
-                                f.write(f"Current action_queue: {action_queue} \n")
-
-                            taken_action = action_queue.pop(0)
-                            obs, reward, done, infos = env.step(taken_action)
-
-                            if "coin" in obs:
-                                taken_action = "take coin"
-                                obs, reward, done, infos = env.step(taken_action)
-                                end_game = True
-                                with open(file_name, "a") as f:
-                                    f.write('Coin found!')
-                                    f.write(f"Final obs: {obs} \n")
-                                coin_found = True
-                                break
-
-                            action_text = "Action: " + taken_action + "\n"
-                            obs_text = summarize_obs(obs) + "\n"
-                            brief_obs = action_text + obs_text
-                            obs_queue.append(brief_obs)
-
-                            with open(file_name, "a") as f:
-                                f.write(f"> {taken_action} \n {obs} \n")
-
-                            msg, _code = map_env_feedback_to_large_loop_error(brief_obs, taken_action)
-                            if msg:
-                                large_loop_error_message = msg
-                                with open(file_name, "a") as f:
-                                    f.write(f"Large loop error message: {large_loop_error_message} \n")
-                                break
-
-                            tem_memory += brief_obs
-
-                            if not action_queue:
-                                action_passed = True
-                                successful_actions.extend(tem_action_queue)
-                                overall_memory += tem_memory
-
-                        if (within_step_tries == 5 and not action_passed) or end_game:
-                            end_game = True
-                            break
-
-                    trial_record.append(trial_step_record)
-                    if end_game:
-                        break
-
-                with open(f"output/{result_name}.csv", "a", newline="") as csvfile:
-                    model_type = "PyIR"
-                    data_row = [today, model_name, model_type, goal_type, trial,
-                                coin_found, len(trial_record)-1, trial_record[-1][-1], trial_record]
-                    writer = csv.writer(csvfile)
-                    writer.writerow(data_row)
-                break
-
-            except Exception as e:
-                error_log_path = f"output/{folder_name}/errors.txt"
-                with open(error_log_path, "a") as f:
-                    log_message = (
-                        f"[PyIR] Trial {trial} (Attempt {retry+1}) | "
-                        f"Model: {model_name} | Goal Type: {goal_type} | "
-                        f"Failed: {str(e)}\n"
-                    )
-                    f.write(log_message)
-                retry += 1
 
 
 i = 0
-num_trials = 3
+num_trials = 10
 # folder_name = "CC_o4_mini_high"
 # folder_name = "yewon_coin_0818_easier2_toreport_2"
-folder_name = "yewon_coin_0819_pyir" 
+folder_name = "yewon_coin_0929_gemini_open"  # gemini
 # 1
 
 result_name = folder_name
-model_id1 = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+model_id1 = "meta-llama/Meta-Llama-3-70B-Instruct"
 model_id2 = "Qwen/Qwen3-32B"
-model_id3 = "meta-llama/Llama-3.3-70B-Instruct"
+model_id3 = "Qwen/Qwen3-8B"
 openai_model = "o4-mini"
-## Run PlanGen models
+
 # run_baseline_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name)
-# clear_cuda_memory(model_id1)
-# run_baseline_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name)
-# clear_cuda_memory(model_id2)
-# run_baseline_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name)
-# clear_cuda_memory(model_id3)
-# run_baseline_model(openai_model, i, i+num_trials, folder_name=folder_name, result_name=result_name)
-
-## Run PDDLego+ models
 # run_iterative_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model2(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 # clear_cuda_memory(model_id1)
-# run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# clear_cuda_memory(model_id2)
-# run_iterative_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# clear_cuda_memory(model_id3)
-# run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-# clear_cuda_memory(model_id2)
-# run_iterative_model("o3-mini-2025-01-31", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_iterative_model(openai_model, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_iterative_model("gpt-4o", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="subgoal")
-# run_iterative_model("o4-mini-2025-04-16", i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 
-run_pyir_model(openai_model, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_pyir_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_pyir_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name)
+run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_iterative_model2(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+clear_cuda_memory(model_id2)
+
+# run_baseline_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name)
+# run_iterative_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model2(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# clear_cuda_memory(model_id3)
+
+# run_baseline_model(openai_model, i, i+num_trials, folder_name=folder_name, result_name=result_name)
+# run_iterative_model(openai_model, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+# run_iterative_model2(openai_model, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
