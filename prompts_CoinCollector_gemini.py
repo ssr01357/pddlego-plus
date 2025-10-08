@@ -1,7 +1,3 @@
-# ====================================================================================
-# 변경 없는 프롬프트들
-# ====================================================================================
-
 SYS_PROMPT_PLAN = """
 You will be given a naturalistic domain description and problem description.
 Your task is to generate a plan (a series of actions).
@@ -10,7 +6,6 @@ SYS_PROMPT_PDDL = """
 You will be given a naturalistic domain description and problem description. 
 Your task is to generate domain file and problem file in Planning Domain Definition Language (PDDL) with appropriate tags.
 """
-# SYS_PROMPT_PYIR은 사용하지 않는다면 제거해도 무방합니다.
 SYS_PROMPT_PYIR = (
     "Generate a class-based Python IR for PDDL. "
     "Output strict JSON with keys py_domain and py_problem only."
@@ -25,66 +20,6 @@ prompt_format = """
         }}
 """
 
-#####################################################
-prompt_prev_files = """
-This is all the memory you have in this game including each action and its corresponding observations: 
-{overall_memory}
-You have already generated df and pf files according to the observations.
-This is previous domain file: 
-{prev_df}
-This is previous problem file: 
-{prev_pf}
-"""
-
-# error from Parser(df, pf)
-prompt_error_parser = """
-You made some mistakes when generating those files. Here is the error message: 
-{prev_err}
-"""
-#####################################################
-# error from simulation environment
-prompt_simulation_error = """
-Based on the df and pf that you generated, the external solver could generate a plan but after simulating in the game environment, it caused those errors: 
-{large_loop_error_message} 
-"""
-
-prompt_baseline = """
-You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
-Here are your current observations: {brief_obs}
-Here are some valid actions you can take: {valid_actions}
-Your goal is to explore new locations and interact with the environment effectively. Ensure actions are logical and do not repeat unnecessarily.
-Additional context:
-{overall_memory}
-If there are errors or obstacles, here is the message:
-{large_loop_error_message}
-Provide the output in strict JSON format like this, while you should only generate one action at a time:
-{{
-    "actions": ["action1"]
-}}
-"""
-
-# ====================================================================================
-# 수정된 프롬프트들 (A안 반영)
-# ====================================================================================
-
-# [변경됨] 연결 정보 업데이트 강조
-prompt_new_obs = """
-Now modify those two files according to the new observations and notes. Fix any errors you made in the previous setting according to the new observation.
-Pay close attention if the observation reveals a new location (e.g., "revealing the...") and ensure (connected ...) predicates are correctly added/updated in the problem file based on the discovery.
-Generate updated files based on your new observation.
-"""
-
-# [변경됨] 목표 설정 전략 재강조
-prompt_duplicate_note = """
-You are repeating the same sequence of actions for at least three times. You may stuck in one location or have the wrong goal.
-You should revise your problem file to avoid the repeat.
-Remember your goal is always to keep exploration: this means prioritizing opening closed doors (information gathering goal) or moving to unvisited known locations (movement goal). Ensure your goal reflects this intent.
-"""
-
-
-# [1] PDDL Generation (Single-step)
-
-# [변경됨] 액션 정의 변경, 부분 관찰 가능성 및 Predicate 사용 규칙, 목표 설정 전략 추가
 prompt_obs_action_subgoal = """
     You are in a partially observable environment that you explore step by step. You must build and update PDDL files based ONLY on your observations. 
     Do not invent information. Crucially, you do NOT know where a closed door leads until you open it.
@@ -118,7 +53,6 @@ prompt_obs_action_subgoal = """
     Note: in problem file's init, you shouldn't have "not ()" but only the single status.
 """ 
 
-# [변경됨] 액션 정의 변경, 부분 관찰 가능성 및 Predicate 사용 규칙, 상세한 목표 설정 전략 추가
 prompt_obs_action_detailed = """
     You are in a partially observable environment that you explore step by step. You must build and update PDDL files based ONLY on your observations. 
     Do not invent information. Crucially, you do NOT know where a closed door leads until you open it.
@@ -152,6 +86,52 @@ prompt_obs_action_detailed = """
 
     Note: in problem file's init, you shouldn't have "not ()" but only the single status.
 """ 
+#####################################################
+
+prompt_prev_files = """
+This is all the memory you have in this game including each action and its corresponding observations: 
+{overall_memory}
+You have already generated df and pf files according to the observations.
+This is previous domain file: 
+{prev_df}
+This is previous problem file: 
+{prev_pf}
+"""
+
+prompt_new_obs = """
+Now modify those two files according to the new observations and notes. Fix any errors you made in the previous setting according to the new observation.
+Pay close attention if the observation reveals a new location (e.g., "revealing the...") and ensure (connected ...) predicates are correctly added/updated in the problem file based on the discovery.
+Generate updated files based on your new observation.
+"""
+prompt_error_parser = """
+You made some mistakes when generating those files. Here is the error message: 
+{prev_err}
+"""
+#####################################################
+# error from simulation environment
+prompt_simulation_error = """
+Based on the df and pf that you generated, the external solver could generate a plan but after simulating in the game environment, it caused those errors: 
+{large_loop_error_message} 
+"""
+prompt_duplicate_note = """
+You are repeating the same sequence of actions for at least three times. You may stuck in one location or have the wrong goal.
+You should revise your problem file to avoid the repeat.
+Remember your goal is always to keep exploration: this means prioritizing opening closed doors (information gathering goal) or moving to unvisited known locations (movement goal). Ensure your goal reflects this intent.
+"""
+prompt_baseline = """
+You are in an environment that you explore step by step. Based on your observations, generate a series of valid actions to progress in the environment.
+Here are your current observations: {brief_obs}
+Here are some valid actions you can take: {valid_actions}
+Your goal is to explore new locations and interact with the environment effectively. Ensure actions are logical and do not repeat unnecessarily.
+Additional context:
+{overall_memory}
+If there are errors or obstacles, here is the message:
+{large_loop_error_message}
+Provide the output in strict JSON format like this, while you should only generate one action at a time:
+{{
+    "actions": ["action1"]
+}}
+"""
 
 
 # =========================
@@ -165,7 +145,6 @@ The format should strictly be:
 }}
 """
 
-# [변경됨] 액션 정의 변경, 필수 Predicate 및 액션 조건 정의 가이드라인 추가
 prompt_df_generation = """
 You are in a partially observable environment. Your task is to generate a PDDL domain file ('df') based on the observations and valid actions.
 
@@ -198,7 +177,6 @@ The format should strictly be:
 }}
 """
 
-# [변경됨] 연결 정보(connected) 사용 규칙 및 관찰 해석 가이드 상세화
 prompt_pf_init_generation = """
 You are in a partially observable environment. Your task is to define the objects and the initial state for a PDDL problem file ('pf') based on the provided domain file ('df') and your current observations.
 **DO NOT** generate the `(:goal ...)` section in this step. 
@@ -232,7 +210,6 @@ The format should strictly be:
 }}
 """
 
-# [변경됨] 목표 설정 전략(정보 획득 vs 이동) 명확화
 prompt_pf_complete_generation = """
 You are in a partially observable environment. Your output must be one single, complete PDDL problem file. To create it, add a `(:goal ...)` section to the provided objects and initial state, then wrap everything in the standard `(define (problem ...))` structure.
 

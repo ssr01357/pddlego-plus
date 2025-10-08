@@ -10,7 +10,6 @@ SYS_PROMPT_PYIR = (
     "Generate a class-based Python IR for PDDL. "
     "Output strict JSON with keys py_domain and py_problem only."
 )
-
 ##############################################
 prompt_format = """
     Please provide the output in strict JSON format, without any additional text or explanation, including a PDDL domain file as 'df' and a PDDL problem file as 'pf'. 
@@ -20,7 +19,6 @@ prompt_format = """
         "pf": "..."
         }}
 """
-
 
 prompt_obs_action_subgoal = """
     You are in an environment that you explore step by step. You must build and update PDDL files of the environment based on only your observations. 
@@ -75,14 +73,13 @@ This is previous problem file:
 
 """
 
-#####################################################
 prompt_new_obs = """
 Now modify those two files according to the new observations and notes. Fix any errors you made in the previous setting according to the new observation.
 Generate updated files based on your new observation.
 
 """
 
-# error from Parser(df, pf)
+
 prompt_error_parser = """
 You made some mistakes when generating those files. Here is the error message: 
 {prev_err}
@@ -94,10 +91,8 @@ You made some mistakes when generating those files. Here is the error message:
 prompt_simulation_error = """
 Based on the df and pf that you generated, the external solver could generate a plan but after simulating in the game environment, it caused those errors: 
 {large_loop_error_message} 
-
 """
 
-#####################################################
 prompt_duplicate_note = """
 You are repeating the same sequence of actions for at least three times. You may stuck in one location or have the wrong goal.
 You should revise your problem file to avoid the repeat.
@@ -132,7 +127,6 @@ The format should strictly be:
 {{
   "df": "..."
 }}
-
 """
 
 prompt_df_generation = """
@@ -149,9 +143,6 @@ You should generate a df that strictly follows these valid actions. There are in
 2. :action move
     :parameters (?from - location ?to - location ?dir - direction)
 """
-
-
-
 
 prompt_format_pf_init = """
 Please provide the output in a strict JSON format, without any additional text or explanation.

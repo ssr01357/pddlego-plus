@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "0, 1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "4, 5"
 import torch
 import gc
 import time
@@ -22,20 +22,19 @@ from textworld_express import TextWorldExpressEnv
 
 from openai import OpenAI
 from utils import repair_json
-from prompts_CoinCollector_gemini import *
+from prompts_CoinCollector_final import *
 from solver import run_solver
 
 _hf_engine_cache: dict[str, HuggingEngine] = {}
 
-OPENAI_MODELS_LIST = ['gpt-4o','o3-mini',"gpt-4.1","o4-mini", "gpt-5-nano-2025-08-07"]
+OPENAI_MODELS_LIST = ['gpt-4o','o3-mini',"gpt-4.1","o4-mini", "gpt-5-nano-2025-08-07", "gpt-5-nano"]
 ENV_PARAMS = {"gameName": "coin", "gameParams": "numLocations=11,numDistractorItems=0,includeDoors=1,limitInventorySize=0"}
 MAX_STEPS = 20
 
-# close door to
-# can be moved to utils.py
 def _sanitize_valid_actions(infos):
-    vals = sorted(infos['validActions'])
-    return [v for v in vals if v not in ("look around", "inventory") and not v.startswith("close door to")]
+    # vals = sorted(infos['validActions'])
+    # return [v for v in vals if v not in ("look around", "inventory") and not v.startswith("close door to")]
+    return ['move east', 'move north', 'move south', 'move west', 'open door to east', 'open door to north', 'open door to south', 'open door to west']
 
 def clear_cuda_memory(model_name):
     global _hf_engine_cache
@@ -145,11 +144,6 @@ def map_actions(action):
     return action_lst
 
 def map_env_feedback_to_large_loop_error(brief_obs: str, taken_action: str):
-    """
-    Map environment feedback in `brief_obs` (and the `taken_action`) to a
-    single large_loop_error_message. Returns (message, code) or (None, None)
-    if no actionable error was detected.
-    """
     # Door is closed -> tell the planner to open it before moving
     if "You can't move there, the door is closed." in brief_obs:
         msg = (
@@ -180,7 +174,7 @@ def map_env_feedback_to_large_loop_error(brief_obs: str, taken_action: str):
         elif "move" in taken_action:
             msg = (
                 f"This is the action you take: {taken_action}. "
-                "You cannot move to that direction. Review the predicate of your actions and the problem files to check the status."
+                "You cannot move to that direction."
             )
             return msg, "invalid_move"
         else:
@@ -286,11 +280,7 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                 env.load(**ENV_PARAMS)
                 obs, infos = env.reset(seed=trial, gameFold="train", generateGoldPath=True)
                 valid_actions = _sanitize_valid_actions(infos)
-                # if "coin" in obs.lower():
-                #     print("Coin found at the beginning!")
-                #     coin_found = True
-                #     exit(0)
-
+        
                 # If coin is visible in the very first observation, skip this seed and
                 # extend the window so we still complete the requested number of meaningful trials.
                 if "coin" in obs.lower():
@@ -351,6 +341,10 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                         tem_memory = ""
 
                         start_checkpoint = True
+
+                        executed_actions = [] 
+                        executed_memory = ""
+
                         while start_checkpoint or action_queue:
                             with open(file_name, "a") as f:
                                 f.write(f'Small Loop, action_queue: {action_queue} \n')
@@ -430,6 +424,10 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                             obs, reward, done, infos = env.step(taken_action)
                             valid_actions = _sanitize_valid_actions(infos)
 
+                            executed_actions.append(taken_action)
+                            brief_obs = "Action: " + taken_action + "\n" + summarize_obs(obs)+'\n'
+                            executed_memory += brief_obs 
+
                             # Directly end the game if found coin
                             if "coin" in obs:
                                 taken_action = "take coin"
@@ -442,10 +440,10 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
                                     coin_found = True
                                 break
                             
-                            action_text = "Action: " + taken_action + "\n"
-                            obs_text = summarize_obs(obs) + "\n"
+                            # action_text = "Action: " + taken_action + "\n"
+                            # obs_text = summarize_obs(obs) + "\n"
 
-                            brief_obs = action_text + obs_text
+                            # brief_obs = action_text + obs_text
 
                             obs_queue.append(brief_obs)
                             with open(file_name, "a") as f:
@@ -453,7 +451,10 @@ def run_iterative_model(model_name, start_trial = 0, end_trial = 11, folder_name
 
                             large_loop_error_message, _code = map_env_feedback_to_large_loop_error(brief_obs, taken_action)
                             # If you want to go one step further later, you can use the returned _code
-                            if _code == "env_error":
+                            if _code:
+                                if executed_actions:
+                                    successful_actions.extend(executed_actions[:-1]) # except the last one that caused error
+                                    overall_memory += executed_memory[:-len(brief_obs)] # except the last one that caused error
                                 action_passed = False
                                 break
 
@@ -529,10 +530,7 @@ def run_iterative_model2(model_name, start_trial = 0, end_trial = 11, folder_nam
                 env.load(**ENV_PARAMS)
                 obs, infos = env.reset(seed=trial, gameFold="train", generateGoldPath=True)
                 valid_actions = _sanitize_valid_actions(infos)
-                # if "coin" in obs.lower():
-                #     print("Coin found at the beginning!")
-                #     coin_found = True
-                #     exit(0)
+ 
                 # If coin is visible in the very first observation, skip this seed and
                 # extend the window so we still complete the requested number of meaningful trials.
                 if "coin" in obs.lower():
@@ -589,6 +587,9 @@ def run_iterative_model2(model_name, start_trial = 0, end_trial = 11, folder_nam
                         action_queue = [] # reset action_queue ()
                         tem_action_queue = []
                         tem_memory = ""
+
+                        executed_actions = []
+                        executed_memory = ""
 
                         start_checkpoint = True
                         while start_checkpoint or action_queue:
@@ -698,6 +699,10 @@ def run_iterative_model2(model_name, start_trial = 0, end_trial = 11, folder_nam
                             obs, reward, done, infos = env.step(taken_action)
                             valid_actions = _sanitize_valid_actions(infos)
 
+                            executed_actions.append(taken_action)
+                            brief_obs = "Action: " + taken_action + "\n" + summarize_obs(obs)+'\n'
+                            executed_memory += brief_obs 
+
                             # Directly end the game if found coin
                             if "coin" in obs:
                                 taken_action = "take coin"
@@ -710,10 +715,10 @@ def run_iterative_model2(model_name, start_trial = 0, end_trial = 11, folder_nam
                                     coin_found = True
                                 break
                             
-                            action_text = "Action: " + taken_action + "\n"
-                            obs_text = summarize_obs(obs) + "\n"
+                            # action_text = "Action: " + taken_action + "\n"
+                            # obs_text = summarize_obs(obs) + "\n"
 
-                            brief_obs = action_text + obs_text
+                            # brief_obs = action_text + obs_text
 
                             obs_queue.append(brief_obs)
                             with open(file_name, "a") as f:
@@ -721,7 +726,11 @@ def run_iterative_model2(model_name, start_trial = 0, end_trial = 11, folder_nam
 
                             large_loop_error_message, _code = map_env_feedback_to_large_loop_error(brief_obs, taken_action)
                             # If you want to go one step further later, you can use the returned _code
-                            if _code == "env_error":
+                            if _code:
+                                # action_passed = False
+                                if executed_actions:
+                                    successful_actions.extend(executed_actions[:-1]) # except the last one that caused error
+                                    overall_memory += executed_memory[:-len(brief_obs)] # except the last one that caused error
                                 action_passed = False
                                 break
 
@@ -796,10 +805,7 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
                 env.load(**ENV_PARAMS)
                 obs, infos = env.reset(seed=trial, gameFold="train", generateGoldPath=True)
                 valid_actions = _sanitize_valid_actions(infos)
-                # if "coin" in obs.lower():
-                #     print("Coin found at the beginning!")
-                #     coin_found = True
-                #     exit(0)
+           
                 # If coin is visible in the very first observation, skip this seed and
                 # extend the window so we still complete the requested number of meaningful trials.
                 if "coin" in obs.lower():
@@ -958,33 +964,21 @@ def run_baseline_model(model_name, start_trials, end_trials, folder_name="08_031
 
 
 i = 0
-num_trials = 10
-# folder_name = "CC_o4_mini_high"
-# folder_name = "yewon_coin_0818_easier2_toreport_2"
-folder_name = "yewon_coin_0929_gemini_open"  # gemini
-# 1
+num_trials = 20
+# folder_name = "yewon_coin_1006_finalPrompt2"  # when _code detected, action_passed = False comment out
+folder_name = "yewon_coin_1008_finalPrompt3"  # executed actions and memory added when _code detected
+
 
 result_name = folder_name
 model_id1 = "meta-llama/Meta-Llama-3-70B-Instruct"
 model_id2 = "Qwen/Qwen3-32B"
 model_id3 = "Qwen/Qwen3-8B"
-openai_model = "o4-mini"
+openai_model = "gpt-5-nano-2025-08-07" # most cost-efficient
 
-# run_baseline_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name)
-# run_iterative_model(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_iterative_model2(model_id1, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# clear_cuda_memory(model_id1)
 
-run_baseline_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name)
+
 run_iterative_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
 run_iterative_model2(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
+run_baseline_model(model_id2, i, i+num_trials, folder_name=folder_name, result_name=result_name)
+
 clear_cuda_memory(model_id2)
-
-# run_baseline_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name)
-# run_iterative_model(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_iterative_model2(model_id3, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# clear_cuda_memory(model_id3)
-
-# run_baseline_model(openai_model, i, i+num_trials, folder_name=folder_name, result_name=result_name)
-# run_iterative_model(openai_model, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
-# run_iterative_model2(openai_model, i, i+num_trials, folder_name=folder_name, result_name=result_name, goal_type="detailed")
